@@ -152,37 +152,84 @@ int main(int argc, char *argv[]){
 
     for (int j = 0; j < totalSteps; ++j){
 
-        if(rank==0){
-            cout << "--------time step---------" << j << "--------"<< endl;
+        if (rank == 0){
+            cout << "--------time step---------" << j << "--------" << endl;
         }
-
-        computeDamageStatus(ndim, n1, n2, dx, horizon, bondDamageThreshold, localParticles, Neighborslist, bondDamage, globalLocalIDmap);
-
-        if (boundaryTop.size() > 0) {applyVelocityBC(ndim, boundaryTop, vt, velocity, acce);}
-        //if (boundaryBottom.size() > 0) {applyVelocityBC(ndim, boundaryBottom, vb, velocity, acce);}
-
-        updatePositions(ndim, localParticles, stepSize, massDensity, velocity, acce, netF);
-        applyFixedBC(ndim, boundaryBottom, localParticles);
-
-
-        MPI_Barrier(comm);
-
-        updateGhostParticlePositions(ndim, rank, ghostParticles, localParticles, globalLocalIDmap, globalGhostIDmap, comm);
-        
-        MPI_Barrier(comm);
-
-        //long double start_time = MPI_Wtime();
-        computeVelocity(rank, ndim, n1, n2, horizon, dx, massDensity, StiffnessTensor, stepSize, velocity, Neighborslist, acce, netF, localParticles, ghostParticles, globalLocalIDmap, globalPartitionIDmap, globalGhostIDmap, bondDamage);
-        //long double end_time = MPI_Wtime();
-        //long double elapsed_time = end_time - start_time;
-        //cout << "Process " << rank << " execution time: " << elapsed_time << " seconds" << endl;
-
-        MPI_Barrier(comm);
-        if (j % 5000 == 0){
-            //outputLocalParticlesPositions(rank, localParticles, ndim, j);
-            outputGatheredPositions(rank, size, ndim, j, localParticles, comm);
+    
+        if (rank == 0) {
+            double t0 = MPI_Wtime();
+            computeDamageStatus(ndim, n1, n2, dx, horizon, bondDamageThreshold, localParticles, Neighborslist, bondDamage, globalLocalIDmap);
+            double t1 = MPI_Wtime();
+            cout << "computeDamageStatus: " << (t1 - t0) << " sec" << endl;
+        } else {
+            computeDamageStatus(ndim, n1, n2, dx, horizon, bondDamageThreshold, localParticles, Neighborslist, bondDamage, globalLocalIDmap);
         }
-
+    
+        if (boundaryTop.size() > 0) {
+            if (rank == 0) {
+                double t0 = MPI_Wtime();
+                applyVelocityBC(ndim, boundaryTop, vt, velocity, acce);
+                double t1 = MPI_Wtime();
+                cout << "applyVelocityBC (Top): " << (t1 - t0) << " sec" << endl;
+            } else {
+                applyVelocityBC(ndim, boundaryTop, vt, velocity, acce);
+            }
+        }
+    
+        if (rank == 0) {
+            double t0 = MPI_Wtime();
+            updatePositions(ndim, localParticles, stepSize, massDensity, velocity, acce, netF);
+            double t1 = MPI_Wtime();
+            cout << "updatePositions: " << (t1 - t0) << " sec" << endl;
+        } else {
+            updatePositions(ndim, localParticles, stepSize, massDensity, velocity, acce, netF);
+        }
+    
+        if (rank == 0) {
+            double t0 = MPI_Wtime();
+            applyFixedBC(ndim, boundaryBottom, localParticles);
+            double t1 = MPI_Wtime();
+            cout << "applyFixedBC: " << (t1 - t0) << " sec" << endl;
+        } else {
+            applyFixedBC(ndim, boundaryBottom, localParticles);
+        }
+    
+        MPI_Barrier(comm);
+    
+        if (rank == 0) {
+            double t0 = MPI_Wtime();
+            updateGhostParticlePositions(ndim, rank, ghostParticles, localParticles, globalLocalIDmap, globalGhostIDmap, comm);
+            double t1 = MPI_Wtime();
+            cout << "updateGhostParticlePositions: " << (t1 - t0) << " sec" << endl;
+        } else {
+            updateGhostParticlePositions(ndim, rank, ghostParticles, localParticles, globalLocalIDmap, globalGhostIDmap, comm);
+        }
+    
+        MPI_Barrier(comm);
+    
+        if (rank == 0) {
+            double t0 = MPI_Wtime();
+            computeVelocity(rank, ndim, n1, n2, horizon, dx, massDensity, StiffnessTensor, stepSize, velocity, Neighborslist, acce, netF,
+                            localParticles, ghostParticles, globalLocalIDmap, globalPartitionIDmap, globalGhostIDmap, bondDamage);
+            double t1 = MPI_Wtime();
+            cout << "computeVelocity: " << (t1 - t0) << " sec" << endl;
+        } else {
+            computeVelocity(rank, ndim, n1, n2, horizon, dx, massDensity, StiffnessTensor, stepSize, velocity, Neighborslist, acce, netF,
+                            localParticles, ghostParticles, globalLocalIDmap, globalPartitionIDmap, globalGhostIDmap, bondDamage);
+        }
+    
+        MPI_Barrier(comm);
+    
+        if (j % 5000 == 0) {
+            if (rank == 0) {
+                double t0 = MPI_Wtime();
+                outputGatheredPositions(rank, size, ndim, j, localParticles, comm);
+                double t1 = MPI_Wtime();
+                cout << "outputGatheredPositions: " << (t1 - t0) << " sec" << endl;
+            } else {
+                outputGatheredPositions(rank, size, ndim, j, localParticles, comm);
+            }
+        }
     }
 
     MPI_Finalize();

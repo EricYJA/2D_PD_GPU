@@ -1,0 +1,32 @@
+Hello
+findNeighbor completed.
+buildGraph completed.
+distributeGraph completed.
+updatePartitionID completed.
+distributeParticles completed.
+Rank 0: globalParticles deleted.
+Rank 0: globalParticles size after deletion = 0
+createGhostParticles completed.
+buildLocalNeighborlist completed.
+initialize bondDamageThreshold and bondDamage completed.
+--------time step---------0--------
+computeDamageStatus: 1.76317 sec
+applyVelocityBC (Top): 3.758e-06 sec
+updatePositions: 0.000371341 sec
+applyFixedBC: 2.849e-06 sec
+updateGhostParticlePositions: 1.931e-06 sec
+computeVelocity: 68.3105 sec
+outputGatheredPositions: 0.0078658 sec
+--------time step---------1--------
+computeDamageStatus: 1.76415 sec
+applyVelocityBC (Top): 5.414e-06 sec
+updatePositions: 0.000478998 sec
+applyFixedBC: 3.402e-06 sec
+updateGhostParticlePositions: 2.181e-06 sec
+computeVelocity: 68.313 sec
+--------time step---------2--------
+computeDamageStatus: 1.76599 sec
+applyVelocityBC (Top): 5.133e-06 sec
+updatePositions: 0.000399383 sec
+applyFixedBC: 2.002e-06 sec
+updateGhostParticlePositions: 2.011e-06 sec
