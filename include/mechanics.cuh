@@ -385,9 +385,6 @@ __global__ void compute_velocity_kernel_GPU(int ndim,
     int forceIJ[NDIM];
     int forceJI[NDIM];
 
-    int forceIJ_vector[NDIM];
-    int forceJI_vector[NDIM];
-
     // traverse local particles in this partition
     for (int cp_idx = 0; cp_idx < core_particle_size; ++cp_idx)
     {
@@ -409,10 +406,12 @@ __global__ void compute_velocity_kernel_GPU(int ndim,
 
             assert(cp_nb_neighbor_local_size > 0); // Ensure the neighbor is not boundary particle
 
+            long double cp_neighbor_volume = total_local_particle_volume_arr[cp_neighbor_local_idx];
+
             int *cp_nb_neighbor_local_arr = &total_local_particle_neighbors_arr[cp_neighbor_local_idx * MAX_NEIGHBOR_CAPACITY];
 
             computeForceDensityStates_GPU<NDIM, STIFFNESS_TENSOR_SIZE, MAX_NEIGHBOR_CAPACITY>(
-                forceIJ_vector, cp_local_idx, cp_neighbor_local_idx,
+                forceIJ, cp_local_idx, cp_neighbor_local_idx,
                 n1, n2, horizon, dx,
                 stiffness_tensor,
                 core_neighbor_bound_damage_arr,
@@ -426,7 +425,7 @@ __global__ void compute_velocity_kernel_GPU(int ndim,
                 total_local_particle_current_positions_arr);
             
             computeForceDensityStates_GPU<NDIM, STIFFNESS_TENSOR_SIZE, MAX_NEIGHBOR_CAPACITY>(
-                forceJI_vector, cp_neighbor_local_idx, cp_local_idx,
+                forceJI, cp_neighbor_local_idx, cp_local_idx,
                 n1, n2, horizon, dx,
                 stiffness_tensor,
                 core_neighbor_bound_damage_arr,
@@ -440,8 +439,23 @@ __global__ void compute_velocity_kernel_GPU(int ndim,
                 total_local_particle_current_positions_arr);
 
 
-            // TODO: start here
-            
+            for (int i = 0; i < NDIM; ++i)
+            {
+                net_force[i] = (forceIJ[i] - forceJI[i]) * cp_neighbor_volume;
+            }
+        }
+
+        for (int i = 0; i < NDIM; ++i)
+        {
+            core_net_force_arr[cp_local_idx * NDIM + i] = net_force[i];
+        }
+
+        for (int i = 0; i < NDIM; ++i){
+            // compute acceleration
+            acc_new[i] = core_net_force_arr[cp_local_idx * NDIM + i] / massDensity;
+
+            // update velocity
+            core_velocity_arr[cp_local_idx * NDIM + i] += 0.5 * (core_acceleration_arr[cp_local_idx * NDIM + i] + acc_new[i]) * stepSize;
         }
     }
 }
