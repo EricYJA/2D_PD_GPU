@@ -230,6 +230,8 @@ int main(int argc, char *argv[]){
                 outputGatheredPositions(rank, size, ndim, j, localParticles, comm);
             }
         }
+
+        break; // Remove this line to run all time steps
     }
 
     MPI_Finalize();
