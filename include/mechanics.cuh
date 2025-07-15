@@ -4,6 +4,7 @@
 // Note: use structure of arrays (SoA) for GPU compatibility
 // This struct is for demonstration purposes only, which is not used in the code
 #include <assert.h>
+#include <limits>
 #include <vector>
 #include <cmath>
 #include <unordered_map>
@@ -11,12 +12,17 @@
 #include <iostream>
 #include "matrix.h"
 #include "SetupParticleSystem.h"
+#include "util.h"
+
+// TODO: host only access for now, need a way for device access
+static const int INVALID_INT = std::numeric_limits<int>::max();
+static const double INVALID_DOUBLE = std::numeric_limits<double>::max();
 
 __device__ void Mat_GPU_inverse2D(long double *inv,      // Return Val, size = 2*2 in matrix format
                                   long double *elements) // size = 2*2 in matrix format
 {
     // compute determinant
-    long double det = elements[0] * elements[3] - elements[1] * elements[2];
+    double det = elements[0] * elements[3] - elements[1] * elements[2];
 
     assert(det != 0.0); // Ensure the matrix is invertible
 
@@ -37,7 +43,7 @@ __device__ void Mat_GPU_mul_mat(long double *C,
     {
         for (int j = 0; j < N; ++j)
         {
-            long double sum = 0.0L;
+            double sum = 0.0L;
             for (int k = 0; k < N; ++k)
             {
                 sum += A[i * N + k] * B[k * N + j];
@@ -54,7 +60,7 @@ __device__ void Mat_GPU_mul_vec(long double *C,
 {
     for (int i = 0; i < N; ++i)
     {
-        long double sum = 0.0L;
+        double sum = 0.0L;
         for (int j = 0; j < N; ++j)
         {
             sum += A[i * N + j] * B[j];
@@ -579,39 +585,135 @@ void compute_velocity_GPU_host(int rank,
     double *d_total_local_particle_current_positions_arr;
 
     // Allocate memory on GPU
-    cudaMalloc((void **)&d_stiffness_tensor, sizeof(long double) * STIFFNESS_TENSOR_SIZE * STIFFNESS_TENSOR_SIZE);
+    cudaMalloc((void **)&d_stiffness_tensor, sizeof(double) * STIFFNESS_TENSOR_SIZE * STIFFNESS_TENSOR_SIZE);
     cudaMalloc((void **)&d_core_particle_local_ID_arr, sizeof(int) * core_particle_size);
     cudaMalloc((void **)&d_total_local_particle_core_ID_arr, sizeof(int) * total_particle_size);
-    cudaMalloc((void **)&d_core_velocity_arr, sizeof(long double) * core_particle_size * NDIM);
-    cudaMalloc((void **)&d_core_acceleration_arr, sizeof(long double) * core_particle_size * NDIM);
-    cudaMalloc((void **)&d_core_net_force_arr, sizeof(long double) * core_particle_size * NDIM);
-    cudaMalloc((void **)&d_core_neighbor_bound_damage_arr, sizeof(long double) * core_particle_size * MAX_NEIGHBOR_CAPACITY);
+    cudaMalloc((void **)&d_core_velocity_arr, sizeof(double) * core_particle_size * NDIM);
+    cudaMalloc((void **)&d_core_acceleration_arr, sizeof(double) * core_particle_size * NDIM);
+    cudaMalloc((void **)&d_core_net_force_arr, sizeof(double) * core_particle_size * NDIM);
+    cudaMalloc((void **)&d_core_neighbor_bound_damage_arr, sizeof(double) * core_particle_size * MAX_NEIGHBOR_CAPACITY);
     cudaMalloc((void **)&d_total_local_particle_neighbors_arr, sizeof(int) * total_particle_size * MAX_NEIGHBOR_CAPACITY);
     cudaMalloc((void **)&d_total_local_particle_neighbor_sizes_arr, sizeof(int) * total_particle_size);
-    cudaMalloc((void **)&d_total_local_particle_volume_arr, sizeof(long double) * total_particle_size);
+    cudaMalloc((void **)&d_total_local_particle_volume_arr, sizeof(double) * total_particle_size);
     cudaMalloc((void **)&d_total_local_particle_initial_positions_arr, sizeof(double) * total_particle_size * NDIM);
     cudaMalloc((void **)&d_total_local_particle_current_positions_arr, sizeof(double) * total_particle_size * NDIM);
 
     // Precalculate the neighbor information
-    vector<long double> h_stiffness_tensor_arr(STIFFNESS_TENSOR_SIZE * STIFFNESS_TENSOR_SIZE);
+    vector<double> h_stiffness_tensor_arr(STIFFNESS_TENSOR_SIZE * STIFFNESS_TENSOR_SIZE);
+
     vector<int> h_core_particle_local_ID_arr(core_particle_size);
     vector<int> h_total_local_particle_core_ID_arr(total_particle_size);
-    vector<long double> h_core_velocity_arr(core_particle_size * NDIM);
-    vector<long double> h_core_acceleration_arr(core_particle_size * NDIM);
-    vector<long double> h_core_net_force_arr(core_particle_size * NDIM);
-    vector<long double> h_core_neighbor_bound_damage_arr(core_particle_size * MAX_NEIGHBOR_CAPACITY);
+
+    vector<double> h_core_velocity_arr(core_particle_size * NDIM);
+    vector<double> h_core_acceleration_arr(core_particle_size * NDIM);
+    vector<double> h_core_net_force_arr(core_particle_size * NDIM);
+    vector<double> h_core_neighbor_bound_damage_arr(core_particle_size * MAX_NEIGHBOR_CAPACITY);
+
     vector<int> h_total_local_particle_neighbors_arr(total_particle_size * MAX_NEIGHBOR_CAPACITY);
     vector<int> h_total_local_particle_neighbor_sizes_arr(total_particle_size);
-    vector<long double> h_total_local_particle_volume_arr(total_particle_size);
+
+    vector<double> h_total_local_particle_volume_arr(total_particle_size);
     vector<double> h_total_local_particle_initial_positions_arr(total_particle_size * NDIM);
     vector<double> h_total_local_particle_current_positions_arr(total_particle_size * NDIM);
 
-    // Fill the arrays with data from the host
+    // h_stiffness_tensor_arr
     for (int i = 0; i < STIFFNESS_TENSOR_SIZE; ++i)
     {
         for (int j = 0; j < STIFFNESS_TENSOR_SIZE; ++j)
         {
-            h_stiffness_tensor_arr[i * STIFFNESS_TENSOR_SIZE + j] = StiffnessTensor.elements[i][j];
+            h_stiffness_tensor_arr[i * STIFFNESS_TENSOR_SIZE + j] = static_cast<double>(StiffnessTensor.elements[i][j]);
         }
     }
+
+    // h_core_particle_local_ID_arr
+    // h_total_local_particle_core_ID_arr
+    for (int i = 0; i < total_particle_size; ++i) {
+        h_total_local_particle_core_ID_arr[i] = INVALID_INT;
+    }
+
+    for (int i = 0; i < core_particle_size; ++i)
+    {
+        h_core_particle_local_ID_arr[i] = i;
+        h_total_local_particle_core_ID_arr[i] = i;
+    }
+
+    // h_core_velocity_arr
+    // h_core_acceleration_arr
+    // h_core_net_force_arr
+    for (int i = 0; i < core_particle_size; ++i)
+    {
+        Particle &p = localParticles[i];
+        for (int j = 0; j < NDIM; ++j)
+        {
+            h_core_velocity_arr[i * NDIM + j] = velocity[i][j];
+            h_core_acceleration_arr[i * NDIM + j] = acce[i][j];
+            h_core_net_force_arr[i * NDIM + j] = netF[i][j];
+        }
+    }
+
+    // h_core_neighbor_bound_damage_arr
+    for (int i = 0; i < core_particle_size; ++i)
+    {
+        Particle &p = localParticles[i];
+        for (int j = 0; j < MAX_NEIGHBOR_CAPACITY; ++j)
+        {
+            if (j < p.neighbors.size())
+            {
+                int neighbor_globalID = p.neighbors[j];
+                h_core_neighbor_bound_damage_arr[i * MAX_NEIGHBOR_CAPACITY + j] = bondDamage[i][j];
+            }
+            else
+            {
+                h_core_neighbor_bound_damage_arr[i * MAX_NEIGHBOR_CAPACITY + j] = INVALID_DOUBLE;
+            }
+        }
+    }
+
+    for (int i = 0; i < total_particle_size; ++i)
+    {
+        Particle &p = totalParticles[i];
+
+        h_total_local_particle_volume_arr[i] = p.volume;
+
+        for (int j = 0; j < NDIM; ++j)
+        {
+            h_total_local_particle_initial_positions_arr[i * NDIM + j] = p.initialPositions[j];
+            h_total_local_particle_current_positions_arr[i * NDIM + j] = p.currentPositions[j];
+        }
+
+        for (int j = 0; j < p.neighbors.size(); ++j)
+        {
+            int neighbor_globalID = p.neighbors[j];
+            if (new_globalLocalIDmap.find(neighbor_globalID) != new_globalLocalIDmap.end())
+            {
+                int neighbor_local_idx = new_globalLocalIDmap[neighbor_globalID];
+                h_total_local_particle_neighbors_arr[i * MAX_NEIGHBOR_CAPACITY + j] = neighbor_local_idx;
+            }
+            else
+            {
+                h_total_local_particle_neighbors_arr[i * MAX_NEIGHBOR_CAPACITY + j] = INVALID_INT;
+            }
+        }
+
+        h_total_local_particle_neighbor_sizes_arr[i] = totalParticleNeighborSizes[i];
+    }
+
+    // Copy data from host to device
+    cudaMemcpy(d_stiffness_tensor, h_stiffness_tensor_arr.data(), sizeof(long double) * STIFFNESS_TENSOR_SIZE * STIFFNESS_TENSOR_SIZE, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_core_particle_local_ID_arr, h_core_particle_local_ID_arr.data(), sizeof(int) * core_particle_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_total_local_particle_core_ID_arr, h_total_local_particle_core_ID_arr.data(), sizeof(int) * total_particle_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_core_velocity_arr, h_core_velocity_arr.data(), sizeof(long double) * core_particle_size * NDIM, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_core_acceleration_arr, h_core_acceleration_arr.data(), sizeof(long double) * core_particle_size * NDIM, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_core_net_force_arr, h_core_net_force_arr.data(), sizeof(long double) * core_particle_size * NDIM, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_core_neighbor_bound_damage_arr, h_core_neighbor_bound_damage_arr.data(), sizeof(long double) * core_particle_size * MAX_NEIGHBOR_CAPACITY, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_total_local_particle_neighbors_arr, h_total_local_particle_neighbors_arr.data(), sizeof(int) * total_particle_size * MAX_NEIGHBOR_CAPACITY, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_total_local_particle_neighbor_sizes_arr, h_total_local_particle_neighbor_sizes_arr.data(), sizeof(int) * total_particle_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_total_local_particle_volume_arr, h_total_local_particle_volume_arr.data(), sizeof(long double) * total_particle_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_total_local_particle_initial_positions_arr, h_total_local_particle_initial_positions_arr.data(), sizeof(double) * total_particle_size * NDIM, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_total_local_particle_current_positions_arr, h_total_local_particle_current_positions_arr.data(), sizeof(double) * total_particle_size * NDIM, cudaMemcpyHostToDevice); 
+
+    cudaDeviceSynchronize(); // Ensure all data is copied before launching the kernel
+
+    // TODO: continue from here
+    // Launch the kernel
 }

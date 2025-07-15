@@ -2,9 +2,9 @@
 #include <cuda_runtime.h>
 
 // daxpy kernel: y[i] = a * x[i] + y[i]
-__global__ void daxpy(int n, double a, const double* x, double* y)
+__global__ void daxpy(uint32_t n, double a, const double* x, double* y)
 {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) {
         y[i] = a * x[i] + y[i];
     }
@@ -31,13 +31,13 @@ int main()
     std::cout << "Device 0: " << prop.name << std::endl;
 
     // Parameters for daxpy
-    const int N = 1 << 20;     // 1 million elements
+    const uint32_t N = 1 << 30;     // 1 million elements
     const double a = 2.5;
 
     // Host allocations
     double *h_x = new double[N];
     double *h_y = new double[N];
-    for (int i = 0; i < N; ++i) {
+    for (uint32_t i = 0; i < N; ++i) {
         h_x[i] = 1.0;
         h_y[i] = 2.0;
     }
@@ -52,12 +52,18 @@ int main()
     cudaMemcpy(d_y, h_y, N * sizeof(double), cudaMemcpyHostToDevice);
 
     // Launch kernel: use 256 threads per block
-    int threadsPerBlock = 256;
-    int blocks = (N + threadsPerBlock - 1) / threadsPerBlock;
+    uint32_t threadsPerBlock = 256;
+    uint32_t blocks = (N + threadsPerBlock - 1) / threadsPerBlock;
     daxpy<<<blocks, threadsPerBlock>>>(N, a, d_x, d_y);
 
     // Wait for kernel to finish
     cudaDeviceSynchronize();
+
+    // recurrent calling kernel
+    for (uint32_t i = 0; i < (1 << 30); ++i) {
+        daxpy<<<blocks, threadsPerBlock>>>(N, a, d_x, d_y);
+        cudaDeviceSynchronize();
+    }
 
     // Copy result back and check
     cudaMemcpy(h_y, d_y, N * sizeof(double), cudaMemcpyDeviceToHost);

@@ -151,6 +151,16 @@ int main(int argc, char *argv[]){
 
     cout << "initialize bondDamageThreshold and bondDamage completed." << endl;
 
+    // check data structue size
+    if (rank == 0) {
+        cout << "localParticles size: " << localParticles.size() << endl;
+        cout << "ghostParticles size: " << ghostParticles.size() << endl;
+        cout << "Neighborslist size: " << Neighborslist.size() << endl;
+        cout << "bondDamageThreshold size: " << bondDamageThreshold.size() << endl;
+        cout << "bondDamage size: " << bondDamage.size() << endl;
+    }
+
+
     for (int j = 0; j < totalSteps; ++j){
 
         if (rank == 0){
@@ -163,7 +173,7 @@ int main(int argc, char *argv[]){
             double t1 = MPI_Wtime();
             cout << "computeDamageStatus: " << (t1 - t0) << " sec" << endl;
         } else {
-            computeDamageStatus(ndim, n1, n2, dx, horizon, bondDamageThreshold, localParticles, Neighborslist, bondDamage, globalLocalIDmap);
+            cout << "only 1 process is allowed to computeDamageStatus" << endl;
         }
     
         if (boundaryTop.size() > 0) {
@@ -173,7 +183,7 @@ int main(int argc, char *argv[]){
                 double t1 = MPI_Wtime();
                 cout << "applyVelocityBC (Top): " << (t1 - t0) << " sec" << endl;
             } else {
-                applyVelocityBC(ndim, boundaryTop, vt, velocity, acce);
+                cout << "only 1 process is allowed to applyVelocityBC (Top)" << endl;
             }
         }
     
@@ -183,7 +193,7 @@ int main(int argc, char *argv[]){
             double t1 = MPI_Wtime();
             cout << "updatePositions: " << (t1 - t0) << " sec" << endl;
         } else {
-            updatePositions(ndim, localParticles, stepSize, massDensity, velocity, acce, netF);
+            cout << "only 1 process is allowed to updatePositions" << endl;
         }
     
         if (rank == 0) {
@@ -192,7 +202,7 @@ int main(int argc, char *argv[]){
             double t1 = MPI_Wtime();
             cout << "applyFixedBC: " << (t1 - t0) << " sec" << endl;
         } else {
-            applyFixedBC(ndim, boundaryBottom, localParticles);
+            cout << "only 1 process is allowed to applyFixedBC" << endl;
         }
     
         MPI_Barrier(comm);
@@ -203,25 +213,31 @@ int main(int argc, char *argv[]){
             double t1 = MPI_Wtime();
             cout << "updateGhostParticlePositions: " << (t1 - t0) << " sec" << endl;
         } else {
-            updateGhostParticlePositions(ndim, rank, ghostParticles, localParticles, globalLocalIDmap, globalGhostIDmap, comm);
+            cout << "only 1 process is allowed to updateGhostParticlePositions" << endl;
         }
     
         MPI_Barrier(comm);
     
         if (rank == 0) {
+            storeVelocity(ndim, velocity, "./output/velocity_step_0_before.txt");
+
             double t0 = MPI_Wtime();
-            computeVelocity(rank, ndim, n1, n2, horizon, dx, massDensity, StiffnessTensor, stepSize, velocity, Neighborslist, acce, netF,
+            // computeVelocity(rank, ndim, n1, n2, horizon, dx, massDensity, StiffnessTensor, stepSize, velocity, Neighborslist, acce, netF,
+            //                 localParticles, ghostParticles, globalLocalIDmap, globalPartitionIDmap, globalGhostIDmap, bondDamage);
+            compute_velocity_GPU_host(rank, ndim, n1, n2, horizon, dx, massDensity, StiffnessTensor, stepSize, velocity, Neighborslist, acce, netF,
                             localParticles, ghostParticles, globalLocalIDmap, globalPartitionIDmap, globalGhostIDmap, bondDamage);
+
             double t1 = MPI_Wtime();
             cout << "computeVelocity: " << (t1 - t0) << " sec" << endl;
+
+            storeVelocity(ndim, velocity, "./output/velocity_step_0_after.txt");
         } else {
-            computeVelocity(rank, ndim, n1, n2, horizon, dx, massDensity, StiffnessTensor, stepSize, velocity, Neighborslist, acce, netF,
-                            localParticles, ghostParticles, globalLocalIDmap, globalPartitionIDmap, globalGhostIDmap, bondDamage);
+            cout << "only 1 process is allowed to computeVelocity" << endl;
         }
     
         MPI_Barrier(comm);
     
-        if (j % 5000 == 0) {
+        // if (j % 5000 == 0) {
             if (rank == 0) {
                 double t0 = MPI_Wtime();
                 outputGatheredPositions(rank, size, ndim, j, localParticles, comm);
@@ -230,12 +246,11 @@ int main(int argc, char *argv[]){
             } else {
                 outputGatheredPositions(rank, size, ndim, j, localParticles, comm);
             }
-        }
+        // }
 
         break; // Remove this line to run all time steps
     }
 
     MPI_Finalize();
     return 0;
-
 }
