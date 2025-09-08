@@ -4,6 +4,7 @@
 #include <map>
 #include <unordered_map>
 #include "mechanics.h"
+#include "util.h"
 
 using namespace std;
 
@@ -213,6 +214,10 @@ int main(int argc, char *argv[]){
                             localParticles, ghostParticles, globalLocalIDmap, globalPartitionIDmap, globalGhostIDmap, bondDamage);
             double t1 = MPI_Wtime();
             cout << "computeVelocity: " << (t1 - t0) << " sec" << endl;
+            
+            storeVelocity(ndim, velocity, "./output/velocity_step_0_after_ref.txt");
+
+
         } else {
             computeVelocity(rank, ndim, n1, n2, horizon, dx, massDensity, StiffnessTensor, stepSize, velocity, Neighborslist, acce, netF,
                             localParticles, ghostParticles, globalLocalIDmap, globalPartitionIDmap, globalGhostIDmap, bondDamage);

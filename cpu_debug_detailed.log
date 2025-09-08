@@ -1,0 +1,12 @@
+Hello
+findNeighbor completed.
+buildGraph completed.
+distributeGraph completed.
+updatePartitionID completed.
+distributeParticles completed.
+Rank 0: globalParticles deleted.
+Rank 0: globalParticles size after deletion = 0
+createGhostParticles completed.
+buildLocalNeighborlist completed.
+initialize bondDamageThreshold and bondDamage completed.
+--------time step---------0--------

@@ -72,10 +72,17 @@ int main(int argc, char *argv[]){
     }
 
 
+    // For GPU version: Skip distribution and use all particles directly
+    // Since GPU version only supports one process, we can use allParticles directly
+    vector<Particle> allParticles = globalParticles; // Keep all particles for GPU use
+    int totalNumParticles = allParticles.size();
+    
+    // Still create local structures for compatibility with existing code structure
     distributeParticles(rank, size, globalParticles, localParticles, comm);
     int localNumParticles = localParticles.size();
     if(rank == 0){
         cout << "distributeParticles completed." << endl;
+        cout << "GPU will use all " << totalNumParticles << " particles directly" << endl;
     }
 
     //define the particle ID map (global->local)
@@ -83,8 +90,8 @@ int main(int argc, char *argv[]){
     defineParticleIDmap(localParticles, globalLocalIDmap);
     //outputGlobalLocalIDmap(rank, localParticles, globalLocalIDmap);
 
-
-    //remove the globalParticles and release memory
+    
+    //remove the globalParticles and release memory (but keep allParticles for GPU)
     if (rank == 0) {
         globalParticles.clear(); // Removes all elements
         cout << "Rank 0: globalParticles deleted." << endl;
@@ -106,16 +113,30 @@ int main(int argc, char *argv[]){
     vector<set<int>> boundarySet(2 * ndim);
     defineBoundarySet(ndim, dx, boxlimit, boundarySet, localParticles);
 
-
-    vector<vector<long double>> netF(localNumParticles, vector<long double>(ndim, 0.0)), velocity(localNumParticles, vector<long double>(ndim, 0.0)), acce(localNumParticles, vector<long double>(ndim, 0.0));
+    // For GPU version: Use arrays sized for ALL particles (not distributed)
+    vector<vector<long double>> netF(totalNumParticles, vector<long double>(ndim, 0.0));
+    vector<vector<long double>> velocity(totalNumParticles, vector<long double>(ndim, 0.0)); 
+    vector<vector<long double>> acce(totalNumParticles, vector<long double>(ndim, 0.0));
+    
     vector<long double> dispBC(ndim, 0.0);
     vector<int> boundaryLeft(boundarySet[0].begin(), boundarySet[0].end());
     vector<int> boundaryRight(boundarySet[1].begin(), boundarySet[1].end());
     vector<int> boundaryBottom(boundarySet[2].begin(), boundarySet[2].end());
     vector<int> boundaryTop(boundarySet[3].begin(), boundarySet[3].end());
+    
+    // For compatibility with existing local functions, also keep local arrays
+    vector<vector<long double>> netF_local(localNumParticles, vector<long double>(ndim, 0.0));
+    vector<vector<long double>> velocity_local(localNumParticles, vector<long double>(ndim, 0.0)); 
+    vector<vector<long double>> acce_local(localNumParticles, vector<long double>(ndim, 0.0));
+    
     vector<vector<Particle*>> Neighborslist;
     vector<vector<double>> bondDamage(localNumParticles + 1);
     vector<vector<double>> bondDamageThreshold(localNumParticles);
+
+    // Global neighbor list and damage arrays for GPU computation
+    vector<vector<Particle*>> Neighborslist_global;
+    vector<vector<double>> bondDamage_global(totalNumParticles + 1);
+    vector<vector<double>> bondDamageThreshold_global(totalNumParticles);
 
     vector<long double> vt = {0.0, 5.0};
     vector<long double> vb = {0.0, 0.0};
@@ -141,6 +162,28 @@ int main(int argc, char *argv[]){
 
     cout << "buildLocalNeighborlist completed." << endl;
 
+    // Build global neighbor list for GPU computation (using allParticles)
+    if (rank == 0) {
+        Neighborslist_global.resize(totalNumParticles);
+        for (int i = 0; i < totalNumParticles; ++i) {
+            Neighborslist_global[i].clear();
+            for (int j = 0; j < allParticles[i].neighbors.size(); ++j) {
+                int neighborID = allParticles[i].neighbors[j];
+                // Verify that neighborID is valid
+                if (neighborID >= 0 && neighborID < totalNumParticles) {
+                    Neighborslist_global[i].push_back(&allParticles[neighborID]);
+                } else {
+                    cout << "ERROR: Invalid neighborID " << neighborID << " for particle " << i << endl;
+                }
+            }
+        }
+        cout << "buildGlobalNeighborlist completed." << endl;
+        cout << "First particle has " << Neighborslist_global[0].size() << " neighbors" << endl;
+        if (Neighborslist_global[0].size() > 0) {
+            cout << "First neighbor globalID: " << Neighborslist_global[0][0]->globalID << endl;
+        }
+    }
+
     //initialize bondDamageThreshold and bondDamage
 
     for (int piIndex = 0; piIndex < localNumParticles; ++piIndex){
@@ -148,6 +191,15 @@ int main(int argc, char *argv[]){
         bondDamage[piIndex].resize(Neighborslist[piIndex].size(), 0.0);
     }
     bondDamage[localNumParticles].resize(30, 0.0); //to avoid the sengmentation caused by the ghost particle.
+
+    // Initialize global bondDamageThreshold and bondDamage for GPU
+    if (rank == 0) {
+        for (int piIndex = 0; piIndex < totalNumParticles; ++piIndex){
+            bondDamageThreshold_global[piIndex].resize(Neighborslist_global[piIndex].size(), damageThreshold);
+            bondDamage_global[piIndex].resize(Neighborslist_global[piIndex].size(), 0.0);
+        }
+        bondDamage_global[totalNumParticles].resize(30, 0.0); //to avoid the sengmentation caused by the ghost particle.
+    }
 
     cout << "initialize bondDamageThreshold and bondDamage completed." << endl;
 
@@ -179,7 +231,7 @@ int main(int argc, char *argv[]){
         if (boundaryTop.size() > 0) {
             if (rank == 0) {
                 double t0 = MPI_Wtime();
-                applyVelocityBC(ndim, boundaryTop, vt, velocity, acce);
+                applyVelocityBC(ndim, boundaryTop, vt, velocity_local, acce_local);
                 double t1 = MPI_Wtime();
                 cout << "applyVelocityBC (Top): " << (t1 - t0) << " sec" << endl;
             } else {
@@ -189,7 +241,7 @@ int main(int argc, char *argv[]){
     
         if (rank == 0) {
             double t0 = MPI_Wtime();
-            updatePositions(ndim, localParticles, stepSize, massDensity, velocity, acce, netF);
+            updatePositions(ndim, localParticles, stepSize, massDensity, velocity_local, acce_local, netF_local);
             double t1 = MPI_Wtime();
             cout << "updatePositions: " << (t1 - t0) << " sec" << endl;
         } else {
@@ -219,13 +271,26 @@ int main(int argc, char *argv[]){
         MPI_Barrier(comm);
     
         if (rank == 0) {
-            storeVelocity(ndim, velocity, "./output/velocity_step_0_before.txt");
+            storeVelocity(ndim, velocity_local, "./output/velocity_step_0_before.txt");
 
             double t0 = MPI_Wtime();
+            // Use global arrays for GPU computation
             // computeVelocity(rank, ndim, n1, n2, horizon, dx, massDensity, StiffnessTensor, stepSize, velocity, Neighborslist, acce, netF,
             //                 localParticles, ghostParticles, globalLocalIDmap, globalPartitionIDmap, globalGhostIDmap, bondDamage);
-            compute_velocity_GPU_host(rank, ndim, n1, n2, horizon, dx, massDensity, StiffnessTensor, stepSize, velocity, Neighborslist, acce, netF,
-                            localParticles, ghostParticles, globalLocalIDmap, globalPartitionIDmap, globalGhostIDmap, bondDamage);
+            
+            // For GPU: Create dummy maps since we're using all particles directly
+            unordered_map<int, int> dummyGlobalLocalIDmap;
+            map<int, int> dummyGlobalPartitionIDmap;
+            unordered_map<int, int> dummyGlobalGhostIDmap;
+            vector<Particle> emptyGhostParticles; // Empty ghost particles for GPU
+            
+            // Map all particles to themselves (identity mapping)
+            for (int i = 0; i < totalNumParticles; ++i) {
+                dummyGlobalLocalIDmap[i] = i;
+            }
+            
+            compute_velocity_GPU_host(rank, ndim, n1, n2, horizon, dx, massDensity, StiffnessTensor, stepSize, velocity, Neighborslist_global, acce, netF,
+                            allParticles, emptyGhostParticles, dummyGlobalLocalIDmap, dummyGlobalPartitionIDmap, dummyGlobalGhostIDmap, bondDamage_global);
 
             double t1 = MPI_Wtime();
             cout << "computeVelocity: " << (t1 - t0) << " sec" << endl;
