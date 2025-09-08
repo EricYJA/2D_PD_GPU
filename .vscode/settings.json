@@ -66,6 +66,7 @@
         "variant": "cpp",
         "semaphore": "cpp",
         "format": "cpp",
-        "__nullptr": "cpp"
+        "__nullptr": "cpp",
+        "__tree": "cpp"
     }
 }

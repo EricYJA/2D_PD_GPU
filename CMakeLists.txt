@@ -44,3 +44,16 @@ target_link_libraries(2D_Hassa_test_gpu
   ${METIS_LIB}
   CUDA::cudart
 )
+
+# Sequential version
+add_executable(main_seq
+  src/main_seq.cpp
+  src/SetupParticleSystem.cpp
+  src/matrix.cpp
+)
+target_link_libraries(main_seq
+  Eigen3::Eigen
+  ${MPI_LIBRARIES}
+  ${PARMETIS_LIB}
+  ${METIS_LIB}
+)

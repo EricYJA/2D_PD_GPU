@@ -90,7 +90,7 @@ vector<matrix> computeShapeTensors(int ndim, double n1, double n2, double dx, do
     double length = sqrt(length2);
     
     // Debug output for shape tensor computation - trace first particle
-    bool debug_this = (pi.initialPositions[0] < 1.0 && pi.initialPositions[1] < 1.0);
+    bool debug_this = false;
     if (debug_this) {
         cout << "CPU SHAPE DEBUG: pi=[" << pi.initialPositions[0] << "," << pi.initialPositions[1] 
              << "], pj=[" << pj.initialPositions[0] << "," << pj.initialPositions[1] << "]" << endl;

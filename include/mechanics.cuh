@@ -370,8 +370,12 @@ __device__ void computeForceDensityStates_GPU_pair(double *Tvector,
         return;
     }
 
-    // CRITICAL FIX: Match CPU algorithm exactly
-    // CPU: computeShapeTensors(piNeighbors, pi, pj) - for specific bond pi->pj
+    // STEP-BY-STEP DEBUGGING: Simple implementation matching the second GPU kernel
+    
+    // Get rank for debugging
+    int rank = total_local_particle_core_ID_arr[pi_local_idx];
+    
+    // Step 1: Compute shape tensors for bond pi->pj
     double shape_tensor0[NDIM * NDIM] = {0.0};
     double shape_tensor1[NDIM * NDIM] = {0.0};
     
@@ -383,95 +387,55 @@ __device__ void computeForceDensityStates_GPU_pair(double *Tvector,
                                   total_local_particle_initial_positions_arr,
                                   total_local_particle_current_positions_arr,
                                   pi_local_initial_positions,
-                                  pj_local_initial_positions,  // Shape tensors for specific bond pi->pj
+                                  pj_local_initial_positions,
                                   total_local_particle_size);
 
-    // Compute stress tensor using this specific bond's shape tensors
+    if (pi_local_idx == 0) {
+        printf("GPU STEP1 P%d: pi=%d, pj=%d\n", rank, pi_local_idx, pj_local_idx);
+        printf("GPU STEP1 P%d: bondIJ=[%e,%e], length=%e\n", rank, bondIJ[0], bondIJ[1], length);
+        printf("GPU STEP1 P%d: shape0=[%e,%e,%e,%e]\n", rank, 
+               shape_tensor0[0], shape_tensor0[1], shape_tensor0[2], shape_tensor0[3]);
+        printf("GPU STEP1 P%d: shape1=[%e,%e,%e,%e]\n", rank,
+               shape_tensor1[0], shape_tensor1[1], shape_tensor1[2], shape_tensor1[3]);
+    }
+
+    // Step 2: Compute stress tensor
     double stress_tensor[NDIM * NDIM] = {0.0};
     computeStressTensor_GPU<NDIM, STIFFNESS_TENSOR_SIZE, MAX_NEIGHBOR_CAPACITY>(
         stress_tensor,
-        shape_tensor0,    // Use bond-specific shape tensor
-        shape_tensor1,    // Use bond-specific shape tensor  
+        shape_tensor0,
+        shape_tensor1,
         stiffness_tensor,
         pi_local_idx, pj_local_idx);
 
-    // Compute shape_tensor0^(-1)
+    if (pi_local_idx == 0) {
+        printf("GPU STEP2 P%d: stress=[%e,%e,%e,%e]\n", rank,
+               stress_tensor[0], stress_tensor[1], stress_tensor[2], stress_tensor[3]);
+    }
+
+    // Step 3: Compute shape_tensor0^(-1)
     double shape_tensor0_inv[NDIM * NDIM];
     Mat_GPU_inverse2D(shape_tensor0_inv, shape_tensor0);
-    
-    // Compute stress * shape_tensor0^(-1)
-    double stress_shape_inv_prod[NDIM * NDIM] = {0.0};
-    Mat_GPU_mul_mat(stress_shape_inv_prod, stress_tensor, shape_tensor0_inv, NDIM);
 
-    // Initialize Tmatrix and horizon volume for the specific bond
-    for (int i = 0; i < NDIM * NDIM; ++i) {
-        Tmatrix[i] = 0.0;
-    }
-    
-    // Accumulate from all neighbors of pi (matching CPU exactly)
-    for (int nidx = 0; nidx < pi_neighbor_local_size; ++nidx)
-    {
-        int pi_nb_local_idx = pi_local_neighbor_arr[nidx];
-        if (pi_nb_local_idx < 0) continue;
-        
-        // Add bounds checking
-        if (nidx >= MAX_NEIGHBOR_CAPACITY) break;
-        if (pi_nb_local_idx >= total_local_particle_size) continue;
-        
-        double pi_nb_volume = total_local_particle_volume_arr[pi_nb_local_idx];
-        double *pi_nb_local_initial_positions = &total_local_particle_initial_positions_arr[pi_nb_local_idx * NDIM];
-
-        // Calculate neighbor bond INb from pi to nb
-        double bondINb[NDIM];
-        double lengthNb2 = 0.0;
-        double numerator = 0.0;
-
-        for (int i = 0; i < NDIM; ++i)
-        {
-            bondINb[i] = pi_nb_local_initial_positions[i] - pi_local_initial_positions[i];
-            lengthNb2 += bondINb[i] * bondINb[i];
-            numerator += bondIJ[i] * bondINb[i];  // For angle between IJ and INb
-        }
-
-        double lengthNb = sqrt(lengthNb2);
-        if (length <= 0.0 || lengthNb <= 0.0) continue;
-
-        // Calculate weight based on angle between bondIJ and bondINb
-        double cosAngle = numerator / (length * lengthNb);
-        if (cosAngle > 1.0) cosAngle = 1.0; 
-        else if (cosAngle < -1.0) cosAngle = -1.0;
-
-        double lengthRatio = fabs(length - lengthNb) / (horizon * dx);
-        double weight = exp(-n1 * lengthRatio) * pow(0.5 + 0.5 * cosAngle, n2);
-
-        // Accumulate: Tmatrix += stress * shapeInv * weight * volume (matching CPU exactly)
-        for (int i = 0; i < NDIM; ++i)
-        {
-            for (int j = 0; j < NDIM; ++j)
-            {
-                Tmatrix[i * NDIM + j] += stress_shape_inv_prod[i * NDIM + j] * weight * pi_nb_volume;
-            }
-        }
-        horizonVolume += pi_nb_volume;
+    if (pi_local_idx == 0) {
+        printf("GPU STEP3 P%d: shape0_inv=[%e,%e,%e,%e]\n", rank,
+               shape_tensor0_inv[0], shape_tensor0_inv[1], shape_tensor0_inv[2], shape_tensor0_inv[3]);
     }
 
-    // Normalize by horizon volume and compute final force vector
-    // CPU: Tmatrix.timeScalar(1.0 / horizonVolume).timeVector(bondIJ)
-    if (horizonVolume > 0.0) {
-        for (int i = 0; i < NDIM; ++i)
-        {
-            for (int j = 0; j < NDIM; ++j)
-            {
-                Tmatrix[i * NDIM + j] /= horizonVolume;
-            }
-        }
-        
-        Mat_GPU_mul_vec(Tvector, Tmatrix, bondIJ, NDIM);
-    } else {
-        // Set Tvector to zero if no valid horizon volume
-        for (int i = 0; i < NDIM; ++i) {
-            Tvector[i] = 0.0;
-        }
+    // Step 4: Compute T = stress * shape0_inv 
+    double T_matrix[NDIM * NDIM] = {0.0};
+    Mat_GPU_mul_mat(T_matrix, stress_tensor, shape_tensor0_inv, NDIM);
+
+    if (pi_local_idx == 0) {
+        printf("GPU STEP4 P%d: T_matrix=[%e,%e,%e,%e]\n", rank,
+               T_matrix[0], T_matrix[1], T_matrix[2], T_matrix[3]);
+    }
+
+    // Step 5: Compute final force vector T * bondIJ
+    Mat_GPU_mul_vec(Tvector, T_matrix, bondIJ, NDIM);
+    
+    if (pi_local_idx == 0) {
+        printf("GPU STEP5 P%d: Tvector=[%e,%e]\n", rank, Tvector[0], Tvector[1]);
     }
 }
 
