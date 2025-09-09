@@ -34,8 +34,7 @@ target_link_libraries(2D_Hassa_test_cpu
 add_executable(2D_Hassa_test_gpu
   src/main.cu           # mirror of main.cpp, with CUDA calls
   src/SetupParticleSystem.cpp
-  src/matrix.cpp
-  src/mechanics.cpp     # CPU helpers still needed
+  src/matrix.cpp  # CPU helpers still needed
 )
 target_link_libraries(2D_Hassa_test_gpu
   Eigen3::Eigen

@@ -329,14 +329,14 @@ __device__ void computeForceDensityStates_GPU_pair(double *Tvector,
                                               double dx,
                                               double *stiffness_tensor, // size = STIFFNESS_TENSOR_SIZE * STIFFNESS_TENSOR_SIZE in matrix
 
-                                              /* Stores neighbor index as local index! */
-                                              int total_local_particle_size,           // size = localParticleSize + ghostParticleSize
-                                              int *total_local_particle_neighbors_arr, // size = localParticleSize + ghostParticleSize
+                                              /* Sequential version: all particles are local */
+                                              int total_local_particle_size,           // size = totalParticleSize
+                                              int *total_local_particle_neighbors_arr, // size = totalParticleSize
                                               int *total_local_particle_neighbor_sizes_arr,
                                               int *total_local_particle_core_ID_arr,
 
-                                              double *total_local_particle_volume_arr,            // size = localParticleSize
-                                              double *total_local_particle_initial_positions_arr, // size = localParticleSize * ndim
+                                              double *total_local_particle_volume_arr,            // size = totalParticleSize
+                                              double *total_local_particle_initial_positions_arr, // size = totalParticleSize * ndim
                                               double *total_local_particle_current_positions_arr) // size = localParticleSize * ndim
 {
     // Initialize arrays
@@ -370,11 +370,6 @@ __device__ void computeForceDensityStates_GPU_pair(double *Tvector,
         return;
     }
 
-    // STEP-BY-STEP DEBUGGING: Simple implementation matching the second GPU kernel
-    
-    // Get rank for debugging
-    int rank = total_local_particle_core_ID_arr[pi_local_idx];
-    
     // Step 1: Compute shape tensors for bond pi->pj
     double shape_tensor0[NDIM * NDIM] = {0.0};
     double shape_tensor1[NDIM * NDIM] = {0.0};
@@ -391,11 +386,11 @@ __device__ void computeForceDensityStates_GPU_pair(double *Tvector,
                                   total_local_particle_size);
 
     if (pi_local_idx == 0) {
-        printf("GPU STEP1 P%d: pi=%d, pj=%d\n", rank, pi_local_idx, pj_local_idx);
-        printf("GPU STEP1 P%d: bondIJ=[%e,%e], length=%e\n", rank, bondIJ[0], bondIJ[1], length);
-        printf("GPU STEP1 P%d: shape0=[%e,%e,%e,%e]\n", rank, 
+        printf("GPU STEP1: pi=%d, pj=%d\n", pi_local_idx, pj_local_idx);
+        printf("GPU STEP1: bondIJ=[%e,%e], length=%e\n", bondIJ[0], bondIJ[1], length);
+        printf("GPU STEP1: shape0=[%e,%e,%e,%e]\n", 
                shape_tensor0[0], shape_tensor0[1], shape_tensor0[2], shape_tensor0[3]);
-        printf("GPU STEP1 P%d: shape1=[%e,%e,%e,%e]\n", rank,
+        printf("GPU STEP1: shape1=[%e,%e,%e,%e]\n",
                shape_tensor1[0], shape_tensor1[1], shape_tensor1[2], shape_tensor1[3]);
     }
 
@@ -409,7 +404,7 @@ __device__ void computeForceDensityStates_GPU_pair(double *Tvector,
         pi_local_idx, pj_local_idx);
 
     if (pi_local_idx == 0) {
-        printf("GPU STEP2 P%d: stress=[%e,%e,%e,%e]\n", rank,
+        printf("GPU STEP2: stress=[%e,%e,%e,%e]\n",
                stress_tensor[0], stress_tensor[1], stress_tensor[2], stress_tensor[3]);
     }
 
@@ -418,7 +413,7 @@ __device__ void computeForceDensityStates_GPU_pair(double *Tvector,
     Mat_GPU_inverse2D(shape_tensor0_inv, shape_tensor0);
 
     if (pi_local_idx == 0) {
-        printf("GPU STEP3 P%d: shape0_inv=[%e,%e,%e,%e]\n", rank,
+        printf("GPU STEP3: shape0_inv=[%e,%e,%e,%e]\n",
                shape_tensor0_inv[0], shape_tensor0_inv[1], shape_tensor0_inv[2], shape_tensor0_inv[3]);
     }
 
@@ -427,7 +422,7 @@ __device__ void computeForceDensityStates_GPU_pair(double *Tvector,
     Mat_GPU_mul_mat(T_matrix, stress_tensor, shape_tensor0_inv, NDIM);
 
     if (pi_local_idx == 0) {
-        printf("GPU STEP4 P%d: T_matrix=[%e,%e,%e,%e]\n", rank,
+        printf("GPU STEP4: T_matrix=[%e,%e,%e,%e]\n",
                T_matrix[0], T_matrix[1], T_matrix[2], T_matrix[3]);
     }
 
@@ -435,7 +430,7 @@ __device__ void computeForceDensityStates_GPU_pair(double *Tvector,
     Mat_GPU_mul_vec(Tvector, T_matrix, bondIJ, NDIM);
     
     if (pi_local_idx == 0) {
-        printf("GPU STEP5 P%d: Tvector=[%e,%e]\n", rank, Tvector[0], Tvector[1]);
+        printf("GPU STEP5: Tvector=[%e,%e]\n", Tvector[0], Tvector[1]);
     }
 }
 
@@ -449,14 +444,14 @@ __device__ void computeForceDensityStates_GPU(double *Tvector,
                                               double dx,
                                               double *stiffness_tensor, // size = STIFFNESS_TENSOR_SIZE * STIFFNESS_TENSOR_SIZE in matrix
 
-                                              /* Stores neighbor index as local index! */
-                                              int total_local_particle_size,           // size = localParticleSize + ghostParticleSize
-                                              int *total_local_particle_neighbors_arr, // size = localParticleSize + ghostParticleSize
+                                              /* Sequential version: all particles are local */
+                                              int total_local_particle_size,           // size = totalParticleSize
+                                              int *total_local_particle_neighbors_arr, // size = totalParticleSize
                                               int *total_local_particle_neighbor_sizes_arr,
                                               int *total_local_particle_core_ID_arr,
 
-                                              double *total_local_particle_volume_arr,            // size = localParticleSize
-                                              double *total_local_particle_initial_positions_arr, // size = localParticleSize * ndim
+                                              double *total_local_particle_volume_arr,            // size = totalParticleSize
+                                              double *total_local_particle_initial_positions_arr, // size = totalParticleSize * ndim
                                               double *total_local_particle_current_positions_arr) // size = localParticleSize * ndim
 {
     // Initialize arrays
@@ -648,21 +643,20 @@ __global__ void compute_velocity_kernel_GPU(int ndim,
                                             double stepSize,
 
                                             int core_particle_size,
-                                            int *core_particle_local_ID_arr, // size = localParticleSize
+                                            int *core_particle_local_ID_arr, // size = totalParticleSize
 
-                                            double *core_velocity_arr,              // size = localParticleSize * ndim
-                                            double *core_acceleration_arr,          // size = localParticleSize * ndim
-                                            double *core_net_force_arr,             // size = localParticleSize * ndim
-                                            // Removed: double *core_neighbor_bound_damage_arr, // size = localParticleSize * max_neighbor_capacity
+                                            double *core_velocity_arr,              // size = totalParticleSize * ndim
+                                            double *core_acceleration_arr,          // size = totalParticleSize * ndim
+                                            double *core_net_force_arr,             // size = totalParticleSize * ndim
 
-                                            /* Stores neighbor index as local index! */
-                                            int total_local_particle_size,           // size = localParticleSize + ghostParticleSize
-                                            int *total_local_particle_neighbors_arr, // size = localParticleSize + ghostParticleSize
+                                            /* Sequential version: all particles are local */
+                                            int total_local_particle_size,           // size = totalParticleSize
+                                            int *total_local_particle_neighbors_arr, // size = totalParticleSize
                                             int *total_local_particle_neighbor_sizes_arr,
                                             int *total_local_particle_core_ID_arr,
 
-                                            double *total_local_particle_volume_arr,       // size = localParticleSize
-                                            double *total_local_particle_initial_positions_arr, // size = localParticleSize * ndim
+                                            double *total_local_particle_volume_arr,       // size = totalParticleSize
+                                            double *total_local_particle_initial_positions_arr, // size = totalParticleSize * ndim
                                             double *total_local_particle_current_positions_arr) // size = localParticleSize * ndim
 {
     int cp_idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -771,7 +765,6 @@ __global__ void compute_velocity_kernel_GPU(int ndim,
 
     // Debug output for particle 0 final results
     if (cp_local_idx == 0) {
-        int cp_global_id = total_local_particle_core_ID_arr[cp_local_idx];
         printf("GPU DEBUG P0: final_netF=[%e,%e]\n", net_force[0], net_force[1]);
         printf("GPU DEBUG P0: acceleration=[%e,%e]\n", net_force[0] / massDensity, net_force[1] / massDensity);
     }
@@ -790,8 +783,7 @@ __global__ void compute_velocity_kernel_GPU(int ndim,
     }
 }
 
-void compute_velocity_GPU_host(int rank,
-                               int ndim,
+void compute_velocity_GPU_host(int ndim,
                                double n1,
                                double n2,
                                double horizon,
@@ -803,15 +795,11 @@ void compute_velocity_GPU_host(int rank,
                                vector<vector<Particle *>> &Neighborslist,
                                vector<vector<long double>> &acce,
                                vector<vector<long double>> &netF,
-                               vector<Particle> &localParticles,
-                               vector<Particle> &ghostParticles,
+                               vector<Particle> &allParticles,
                                const unordered_map<int, int> &globalLocalIDmap,
-                               const map<int, int> &globalPartitionIDmap,
-                               const unordered_map<int, int> &globalGhostIDmap,
                                vector<vector<double>> &bondDamage)
 {
-    // localParticles and ghostParticles sum up to be all the particles accessed by this rank
-    // ghost particle contains two hop neighbor of the localParticles
+    // Sequential version: all particles are local, no ghost particles needed
 
     // cast every long double to double for GPU compatibility
     for (auto &v : velocity)
@@ -839,96 +827,37 @@ void compute_velocity_GPU_host(int rank,
     }
 
 
-    // Prepare data for GPU computation
-    int localParticleSize = localParticles.size();
-    int ghostParticleSize = ghostParticles.size();
-
-    int total_particle_size = localParticleSize + ghostParticleSize;
-    int core_particle_size = localParticleSize;
+    // Prepare data for GPU computation - sequential version
+    int total_particle_size = allParticles.size();
+    int core_particle_size = total_particle_size; // All particles are core particles in sequential
 
     constexpr int NDIM = 2;
     constexpr int STIFFNESS_TENSOR_SIZE = 3;  // Assuming 2D, so size is 3 (e11, e22, e12) or 6 for 3D (e11, e22, e33, e23, e13, e12)
     constexpr int MAX_NEIGHBOR_CAPACITY = 30; // Assuming a maximum neighbor capacity, adjust as needed
 
-    vector<Particle> totalParticles; // default first localParticlesSize is core particles, then ghost particles
-    totalParticles.reserve(total_particle_size);
-    totalParticles.insert(totalParticles.end(), localParticles.begin(), localParticles.end());
-    totalParticles.insert(totalParticles.end(), ghostParticles.begin(), ghostParticles.end());
-
-    map<int, int> new_globalLocalIDmap; // Maps global ID to local index in totalParticles
+    // Sequential version: use allParticles directly, no need for complex mapping
+    vector<Particle> totalParticles = allParticles; // Simple copy for sequential version
     
-    // CRITICAL FIX: Ensure deterministic ordering by sorting particles by global ID
-    // This ensures GPU and CPU process particles in the same order
-    std::sort(totalParticles.begin(), totalParticles.end(), 
-              [](const Particle& a, const Particle& b) {
-                  return a.globalID < b.globalID;
-              });
-    
-    for (int i = 0; i < total_particle_size; ++i)
-    {
-        Particle &p = totalParticles[i];
-        // Preserve original global IDs - never overwrite them!
-        new_globalLocalIDmap[p.globalID] = i; // Map original global ID to local index
-    }
+    // For sequential version, global ID equals local index (already established in main_seq.cpp)
+    // Convert unordered_map to map for consistency
+    map<int, int> new_globalLocalIDmap(globalLocalIDmap.begin(), globalLocalIDmap.end());
 
     vector<vector<int>> totalParticleNeighborslist(total_particle_size); // use local idx
     vector<int> totalParticleNeighborSizes(total_particle_size, 0);
 
-    // Fill the neighbor list for each particle with deterministic ordering
+    // Sequential version: simple neighbor list construction
     for (int i = 0; i < total_particle_size; ++i)
     {
-        int missing_neighbor_count = 0;
         Particle &p = totalParticles[i];
         
-        // CRITICAL FIX: Sort neighbors by global ID to ensure deterministic processing order
-        vector<int> sorted_neighbors = p.neighbors;
-        std::sort(sorted_neighbors.begin(), sorted_neighbors.end());
-        
-        for (int j = 0; j < sorted_neighbors.size(); ++j)
+        // For sequential version, all neighbors should be present
+        for (int neighbor_globalID : p.neighbors)
         {
-            int neighbor_globalID = sorted_neighbors[j];
             if (new_globalLocalIDmap.find(neighbor_globalID) != new_globalLocalIDmap.end())
             {
                 int neighbor_local_idx = new_globalLocalIDmap[neighbor_globalID];
                 totalParticleNeighborslist[i].push_back(neighbor_local_idx);
                 totalParticleNeighborSizes[i]++;
-            }
-            else
-            {
-                // If the neighbor is not found in the map, it might be a ghost particle or an invalid neighbor
-                missing_neighbor_count++;
-            }
-        }
-
-        if (missing_neighbor_count > 0 && missing_neighbor_count < sorted_neighbors.size())
-        {
-            // Handle the case where some neighbors are missing
-            std::cout << "Warning: " << (i < core_particle_size ? "Core " : "Ghost ") << "Particle local ID" << i << " has " << missing_neighbor_count << " missing neighbors." << std::endl;
-        }
-        else if (missing_neighbor_count == sorted_neighbors.size())
-        {
-            // If all neighbors are missing, this particle is isolated
-            std::cout << "Warning: " << (i < core_particle_size ? "Core " : "Ghost ") << "Particle local ID" << i << " is isolated with no valid neighbors." << std::endl;
-        }
-
-
-        if (missing_neighbor_count == 0) {
-            totalParticleNeighborSizes[i] = sorted_neighbors.size(); // Update neighbor size only if no missing neighbors
-        } else {
-            totalParticleNeighborslist[i].clear(); // Clear the neighbor list if there are missing neighbors
-            totalParticleNeighborSizes[i] = 0; // Reset neighbor size if there are missing
-        }
-    }
-
-    //sanity check, first hop neighbor should have full neighbor list
-    for (int core_local_id = 0; core_local_id < core_particle_size; ++core_local_id)
-    {
-        vector<int> &neighbors = totalParticleNeighborslist[core_local_id];
-        for (int core_neighbor_local_id : neighbors)
-        {
-            if (totalParticleNeighborSizes[core_neighbor_local_id] == 0)
-            {
-                std::cout << "Error: Core particle local ID " << core_local_id << " has a neighbor with no neighbors." << std::endl;
             }
         }
     }
@@ -942,7 +871,6 @@ void compute_velocity_GPU_host(int rank,
     double *d_core_velocity_arr;
     double *d_core_acceleration_arr;
     double *d_core_net_force_arr;
-    // Removed: d_core_neighbor_bound_damage_arr
 
     int *d_total_local_particle_neighbors_arr;
     int *d_total_local_particle_neighbor_sizes_arr;
@@ -958,14 +886,13 @@ void compute_velocity_GPU_host(int rank,
     cudaMalloc((void **)&d_core_velocity_arr, sizeof(double) * core_particle_size * NDIM);
     cudaMalloc((void **)&d_core_acceleration_arr, sizeof(double) * core_particle_size * NDIM);
     cudaMalloc((void **)&d_core_net_force_arr, sizeof(double) * core_particle_size * NDIM);
-    // Removed: cudaMalloc for d_core_neighbor_bound_damage_arr
     cudaMalloc((void **)&d_total_local_particle_neighbors_arr, sizeof(int) * total_particle_size * MAX_NEIGHBOR_CAPACITY);
     cudaMalloc((void **)&d_total_local_particle_neighbor_sizes_arr, sizeof(int) * total_particle_size);
     cudaMalloc((void **)&d_total_local_particle_volume_arr, sizeof(double) * total_particle_size);
     cudaMalloc((void **)&d_total_local_particle_initial_positions_arr, sizeof(double) * total_particle_size * NDIM);
     cudaMalloc((void **)&d_total_local_particle_current_positions_arr, sizeof(double) * total_particle_size * NDIM);
 
-    // Precalculate the neighbor information
+    // Prepare host arrays for data transfer
     vector<double> h_stiffness_tensor_arr(STIFFNESS_TENSOR_SIZE * STIFFNESS_TENSOR_SIZE);
 
     vector<int> h_core_particle_local_ID_arr(core_particle_size);
@@ -974,7 +901,6 @@ void compute_velocity_GPU_host(int rank,
     vector<double> h_core_velocity_arr(core_particle_size * NDIM);
     vector<double> h_core_acceleration_arr(core_particle_size * NDIM);
     vector<double> h_core_net_force_arr(core_particle_size * NDIM);
-    // Removed: h_core_neighbor_bound_damage_arr
 
     vector<int> h_total_local_particle_neighbors_arr(total_particle_size * MAX_NEIGHBOR_CAPACITY);
     vector<int> h_total_local_particle_neighbor_sizes_arr(total_particle_size);
@@ -992,26 +918,16 @@ void compute_velocity_GPU_host(int rank,
         }
     }
 
-    // h_core_particle_local_ID_arr - maps core particle index to local index in totalParticles
-    // h_total_local_particle_core_ID_arr - stores global ID for each particle in totalParticles
+    // Sequential version: simple mapping since global ID == local index
     for (int i = 0; i < total_particle_size; ++i) {
         h_total_local_particle_core_ID_arr[i] = totalParticles[i].globalID; // Store actual global ID
-    }
-
-    // CRITICAL FIX: Map core particles to their positions in the sorted totalParticles array
-    for (int i = 0; i < core_particle_size; ++i)
-    {
-        int local_particle_global_id = localParticles[i].globalID;
-        // Find where this local particle ended up in the sorted totalParticles array
-        int sorted_local_idx = new_globalLocalIDmap[local_particle_global_id];
-        h_core_particle_local_ID_arr[i] = sorted_local_idx;
+        h_core_particle_local_ID_arr[i] = i; // Simple 1:1 mapping for sequential version
     }
 
     // h_core_velocity_arr, h_core_acceleration_arr, h_core_net_force_arr
-    // CRITICAL FIX: Map velocity/acceleration/netforce to correct positions in sorted array
+    // Sequential version: direct mapping
     for (int i = 0; i < core_particle_size; ++i)
     {
-        Particle &p = localParticles[i];
         for (int j = 0; j < NDIM; ++j)
         {
             h_core_velocity_arr[i * NDIM + j] = velocity[i][j];
@@ -1020,7 +936,7 @@ void compute_velocity_GPU_host(int rank,
         }
     }
 
-    // Removed bond damage initialization
+    // Bond damage not needed for simplified GPU version
 
     for (int i = 0; i < total_particle_size; ++i)
     {
@@ -1057,7 +973,6 @@ void compute_velocity_GPU_host(int rank,
     cudaMemcpy(d_core_velocity_arr, h_core_velocity_arr.data(), sizeof(double) * core_particle_size * NDIM, cudaMemcpyHostToDevice);
     cudaMemcpy(d_core_acceleration_arr, h_core_acceleration_arr.data(), sizeof(double) * core_particle_size * NDIM, cudaMemcpyHostToDevice);
     cudaMemcpy(d_core_net_force_arr, h_core_net_force_arr.data(), sizeof(double) * core_particle_size * NDIM, cudaMemcpyHostToDevice);
-    // Removed: cudaMemcpy for d_core_neighbor_bound_damage_arr
     cudaMemcpy(d_total_local_particle_neighbors_arr, h_total_local_particle_neighbors_arr.data(), sizeof(int) * total_particle_size * MAX_NEIGHBOR_CAPACITY, cudaMemcpyHostToDevice);
     cudaMemcpy(d_total_local_particle_neighbor_sizes_arr, h_total_local_particle_neighbor_sizes_arr.data(), sizeof(int) * total_particle_size, cudaMemcpyHostToDevice);
     cudaMemcpy(d_total_local_particle_volume_arr, h_total_local_particle_volume_arr.data(), sizeof(double) * total_particle_size, cudaMemcpyHostToDevice);
@@ -1080,7 +995,6 @@ void compute_velocity_GPU_host(int rank,
             d_core_velocity_arr,
             d_core_acceleration_arr,
             d_core_net_force_arr,
-            // Removed: d_core_neighbor_bound_damage_arr,
             total_particle_size,
             d_total_local_particle_neighbors_arr,
             d_total_local_particle_neighbor_sizes_arr,
@@ -1134,7 +1048,6 @@ cleanup:
     cudaFree(d_core_velocity_arr);
     cudaFree(d_core_acceleration_arr);
     cudaFree(d_core_net_force_arr);
-    // Removed: cudaFree(d_core_neighbor_bound_damage_arr);
     cudaFree(d_total_local_particle_neighbors_arr);
     cudaFree(d_total_local_particle_neighbor_sizes_arr);
     cudaFree(d_total_local_particle_volume_arr);
