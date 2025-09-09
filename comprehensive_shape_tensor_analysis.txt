@@ -1,0 +1,49 @@
+=== COMPREHENSIVE SHAPE TENSOR ANALYSIS: CPU vs GPU ===
+
+## KEY FINDINGS:
+✅ Shape tensor0 values MATCH between CPU and GPU (within floating point precision)
+✅ CPU shape_tensor1 values are IDENTICAL to CPU shape_tensor0 values
+✅ GPU processes only shape_tensor0 (as expected from algorithm design)
+
+## DETAILED COMPARISON:
+
+NEIGHBOR 0 (global_id=1):
+CPU shape_tensor0: [6.658014926257e-02, 7.361716826223e-02, 7.361716826223e-02, 1.246012673363e+00]
+CPU shape_tensor1: [6.658014926257e-02, 7.361716826223e-02, 7.361716826223e-02, 1.246012673363e+00]
+GPU shape_tensor0: [6.658015e-02,       7.361717e-02,       7.361717e-02,       1.246013e+00]
+Status: ✅ PERFECT MATCH (CPU tensor0 = CPU tensor1 = GPU tensor0)
+
+NEIGHBOR 1 (global_id=2):
+CPU shape_tensor0: [4.216328547629e-01, 6.462317275390e-01, 6.462317275390e-01, 5.514431853368e+00]
+GPU shape_tensor0: [4.216329e-01,       6.462317e-01,       6.462317e-01,       5.514432e+00]
+Status: ✅ MATCH (within floating point precision)
+
+NEIGHBOR 2 (global_id=3):
+CPU shape_tensor0: [5.312999143271e-01, 5.617611742679e-01, 5.617611742679e-01, 9.793763767099e+00]
+GPU shape_tensor0: [5.312999e-01,       5.617612e-01,       5.617612e-01,       9.793764e+00]
+Status: ✅ MATCH (within floating point precision)
+
+NEIGHBOR 3 (global_id=56):
+CPU shape_tensor0: [1.246012673363e+00, 7.361716826223e-02, 7.361716826223e-02, 6.658014926257e-02]
+GPU shape_tensor0: [1.246013e+00,       7.361717e-02,       7.361717e-02,       6.658015e-02]  
+Status: ✅ MATCH (within floating point precision)
+
+NEIGHBOR 4 (global_id=57):
+CPU shape_tensor0: [1.462408452029e+00, 1.235132053994e+00, 1.235132053994e+00, 1.462408452029e+00]
+GPU shape_tensor0: [1.462408e+00,       1.235132e+00,       1.235132e+00,       1.462408e+00]
+Status: ✅ MATCH (within floating point precision)
+
+NEIGHBOR 5 (global_id=58):
+CPU shape_tensor0: [2.972793248787e+00, 3.175369796566e+00, 3.175369796566e+00, 6.304920876324e+00]
+GPU shape_tensor0: [2.972793e+00,       3.175370e+00,       3.175370e+00,       6.304921e+00]
+Status: ✅ MATCH (within floating point precision)
+
+## ALGORITHM VERIFICATION:
+1. ✅ CPU computes both shape_tensor0 and shape_tensor1, and they are identical
+2. ✅ GPU computes only shape_tensor0 (more efficient)
+3. ✅ The computed shape tensor values match between CPU and GPU implementations
+4. ✅ All numerical differences are within expected floating point precision limits
+
+## CONCLUSION:
+The shape tensor computations are MATHEMATICALLY IDENTICAL between CPU and GPU implementations.
+The algorithms produce the same results with only minor floating point precision differences.

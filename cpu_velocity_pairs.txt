@@ -1,0 +1,10 @@
+=== CPU VELOCITY LOOP: Processing pi=0(local=0) -> pj=1(local=1) ===
+=== CPU VELOCITY LOOP: Processing pi=0(local=0) -> pj=2(local=2) ===
+=== CPU VELOCITY LOOP: Processing pi=0(local=0) -> pj=3(local=3) ===
+=== CPU VELOCITY LOOP: Processing pi=0(local=0) -> pj=56(local=56) ===
+=== CPU VELOCITY LOOP: Processing pi=0(local=0) -> pj=57(local=57) ===
+=== CPU VELOCITY LOOP: Processing pi=0(local=0) -> pj=58(local=58) ===
+=== CPU VELOCITY LOOP: Processing pi=0(local=0) -> pj=112(local=112) ===
+=== CPU VELOCITY LOOP: Processing pi=0(local=0) -> pj=113(local=113) ===
+=== CPU VELOCITY LOOP: Processing pi=0(local=0) -> pj=114(local=114) ===
+=== CPU VELOCITY LOOP: Processing pi=0(local=0) -> pj=168(local=168) ===

@@ -314,6 +314,10 @@ vector<long double> computeForceDensityStates(int ndim, double n1, double n2, do
 
         // PARTICLE PAIR DEBUG: Print shape tensor computation call
         if (pi.globalID == 0) {
+            cout << "CPU PAIR PROCESSING: pi=" << pi.globalID << "(local=" << globalLocalIDmap.at(pi.globalID) << ") -> pj=" << pj.globalID << "(local=" << globalLocalIDmap.at(pj.globalID) << "), processing neighbor " << neighbor_idx << ": nb=" << nb->globalID << "(local=" << globalLocalIDmap.at(nb->globalID) << ")" << endl;
+        }
+        
+        if (pi.globalID == 0) {
             cout << "CPU CALL computeShapeTensors: pi_local=" << globalLocalIDmap.at(pi.globalID) << "(global=" << pi.globalID << ") -> nb_local=" << globalLocalIDmap.at(nb->globalID) << "(global=" << nb->globalID << ")" << endl;
         }
         
@@ -412,6 +416,10 @@ void computeVelocity(int ndim, double n1, double n2, double horizon, double dx, 
 
             // PARTICLE PAIR DEBUG: Print forceIJ computation call
             if (i == 0) {
+                cout << "=== CPU VELOCITY LOOP: Processing pi=" << pi.globalID << "(local=" << i << ") -> pj=" << nb->globalID << "(local=" << globalLocalIDmap.at(nb->globalID) << ") ===" << endl;
+            }
+            
+            if (i == 0) {
                 cout << "CPU CALL forceIJ: pi_local=" << i << "(global=" << pi.globalID << ") -> pj_local=" << globalLocalIDmap.at(nb->globalID) << "(global=" << nb->globalID << ")" << endl;
             }
             
@@ -425,7 +433,7 @@ void computeVelocity(int ndim, double n1, double n2, double horizon, double dx, 
             forceJI = computeForceDensityStates(ndim, n1, n2, horizon, StiffnessTensor, dx, pjNeighbors, *nb, pi, globalLocalIDmap, bondDamage);
 
             // Debug output for particle 0 (index 0)
-            if (i == 0 && nb->globalID <= 5) {
+            if (i == 0) {
                 cout << "CPU DEBUG P0: pi=" << pi.globalID << ", pj=" << nb->globalID << endl;
                 cout << "CPU DEBUG P0: forceIJ=[" << scientific << setprecision(6) << forceIJ[0] << "," << forceIJ[1] << "]" << endl;
                 cout << "CPU DEBUG P0: forceJI=[" << scientific << setprecision(6) << forceJI[0] << "," << forceJI[1] << "]" << endl;

@@ -122,9 +122,9 @@ __device__ void computeShapeTensors_GPU(double *shape_tensor0, // Return Val, si
     double length = sqrt(length2);
     
     // Debug output for shape tensor computation - trace particle 0 only
-    bool debug_this = false; // Disable debugging for now
+    bool debug_this = (pi_init_pos[0] == -34.5 && pi_init_pos[1] == -29.5); // Enable for particle 0
     if (debug_this) {
-        printf("GPU SHAPE DEBUG: pi=[%.6f,%.6f], pj=[%.6f,%.6f]\n", 
+        printf("GPU CALL computeShapeTensors: pi_pos=[%.1f,%.1f] -> pj_pos=[%.1f,%.1f]\n", 
                pi_init_pos[0], pi_init_pos[1], pj_init_pos[0], pj_init_pos[1]);
         printf("GPU SHAPE DEBUG: bondIJ=[%.6f,%.6f], length=%.6f\n", 
                bondIJ[0], bondIJ[1], length);
@@ -178,8 +178,8 @@ __device__ void computeShapeTensors_GPU(double *shape_tensor0, // Return Val, si
         double lengthRatio = fabs(length - lengthNb) / (horizon * dx);
         double weight = exp(-n1 * lengthRatio) * pow(0.5 + 0.5 * cosAngle, n2);
 
-        // Debug first few neighbors for detailed analysis
-        if (debug_this && nidx < 3) {
+        // Debug all neighbors for complete analysis
+        if (debug_this) {
             printf("GPU SHAPE DEBUG: neighbor %d: nb_pos=[%.6f,%.6f]\n", 
                    nidx, pi_nb_init_pos_arr[0], pi_nb_init_pos_arr[1]);
             printf("GPU SHAPE DEBUG: neighbor %d: bondINb=[%.6f,%.6f], lengthNb=%.6f\n", 
@@ -248,13 +248,23 @@ __device__ void computeStressTensor_GPU(double *stress_tensor,    // Return Val,
         Imatrix[i * NDIM + i] = 1.0; // Initialize identity matrix
     }
 
+    // FIXED: Match CPU exactly - first compute transpose + original, then apply scalar and subtract I
+    double FplusFT[NDIM * NDIM];
     for (int i = 0; i < NDIM; ++i)
     {
         for (int j = 0; j < NDIM; ++j)
         {
-            // FIXED: Correct strain calculation matching CPU
-            // strain = 0.5 * (deformationGradient + deformationGradient.transpose()) - I
-            strain[i * NDIM + j] = 0.5 * (deformationGradient[i * NDIM + j] + deformationGradient[j * NDIM + i]) - Imatrix[i * NDIM + j];
+            // CPU: (deformationGradient.transpose()).matrixAdd(deformationGradient)
+            FplusFT[i * NDIM + j] = deformationGradient[j * NDIM + i] + deformationGradient[i * NDIM + j];
+        }
+    }
+    
+    for (int i = 0; i < NDIM; ++i)
+    {
+        for (int j = 0; j < NDIM; ++j)
+        {
+            // CPU: strain = strain.timeScalar(0.5); strain = strain.matrixSub(Imatrix);
+            strain[i * NDIM + j] = 0.5 * FplusFT[i * NDIM + j] - Imatrix[i * NDIM + j];
         }
     }
 
@@ -339,98 +349,167 @@ __device__ void computeForceDensityStates_GPU_pair(double *Tvector,
                                               double *total_local_particle_initial_positions_arr, // size = totalParticleSize * ndim
                                               double *total_local_particle_current_positions_arr) // size = localParticleSize * ndim
 {
-    // Initialize arrays
+    // EXACTLY MATCH CPU ALGORITHM: computeForceDensityStates function
     double Tmatrix[NDIM * NDIM] = {0.0};
-    double bondIJ[NDIM];
-    double horizonVolume = 0.0;
+    double bondIJ[NDIM], bondINb[NDIM];
+    double length2 = 0.0, lengthNb2, numerator;
 
-    double *pi_local_current_positions = &total_local_particle_current_positions_arr[pi_local_idx * NDIM];
     double *pi_local_initial_positions = &total_local_particle_initial_positions_arr[pi_local_idx * NDIM];
     double *pj_local_initial_positions = &total_local_particle_initial_positions_arr[pj_local_idx * NDIM];
 
-    // Calculate bond vector IJ (from pi to pj initial positions)
-    double length2 = 0.0;
+    // Calculate bond vector IJ (from pi to pj initial positions) - MATCH CPU EXACTLY
     for (int i = 0; i < NDIM; ++i)
     {
         bondIJ[i] = pj_local_initial_positions[i] - pi_local_initial_positions[i];
         length2 += bondIJ[i] * bondIJ[i];
     }
     double length = sqrt(length2);
+    double horizonVolume = 0.0;
 
     int pi_neighbor_local_size = total_local_particle_neighbor_sizes_arr[pi_local_idx];
     int *pi_local_neighbor_arr = &total_local_particle_neighbors_arr[pi_local_idx * MAX_NEIGHBOR_CAPACITY];
 
     // Check if particle has valid neighbors
     if (pi_neighbor_local_size <= 0) {
-        // Set Tvector to zero if no valid neighbors
-        for (int i = 0; i < NDIM; ++i)
-        {
+        for (int i = 0; i < NDIM; ++i) {
             Tvector[i] = 0.0;
         }
         return;
     }
 
-    // Step 1: Compute shape tensors for bond pi->pj
-    double shape_tensor0[NDIM * NDIM] = {0.0};
-    double shape_tensor1[NDIM * NDIM] = {0.0};
-    
-    computeShapeTensors_GPU<NDIM, MAX_NEIGHBOR_CAPACITY>(shape_tensor0, shape_tensor1,
-                                  n1, n2, dx, horizon,
-                                  pi_neighbor_local_size,
-                                  pi_local_neighbor_arr,
-                                  total_local_particle_volume_arr,
-                                  total_local_particle_initial_positions_arr,
-                                  total_local_particle_current_positions_arr,
-                                  pi_local_initial_positions,
-                                  pj_local_initial_positions,
-                                  total_local_particle_size);
+    // CPU MATCH: Loop through all neighbors of pi (like CPU "for (Particle* nb : piNeighbors)")
+    int neighbor_idx = 0;
+    for (int nidx = 0; nidx < pi_neighbor_local_size; ++nidx)
+    {
+        int pi_nb_local_idx = pi_local_neighbor_arr[nidx];
+        if (pi_nb_local_idx < 0 || pi_nb_local_idx >= total_local_particle_size) continue;
+        
+        double pi_nb_volume = total_local_particle_volume_arr[pi_nb_local_idx];
+        double *pi_nb_local_initial_positions = &total_local_particle_initial_positions_arr[pi_nb_local_idx * NDIM];
 
-    if (pi_local_idx == 0) {
-        printf("GPU STEP1: pi=%d, pj=%d\n", pi_local_idx, pj_local_idx);
-        printf("GPU STEP1: bondIJ=[%e,%e], length=%e\n", bondIJ[0], bondIJ[1], length);
-        printf("GPU STEP1: shape0=[%e,%e,%e,%e]\n", 
-               shape_tensor0[0], shape_tensor0[1], shape_tensor0[2], shape_tensor0[3]);
-        printf("GPU STEP1: shape1=[%e,%e,%e,%e]\n",
-               shape_tensor1[0], shape_tensor1[1], shape_tensor1[2], shape_tensor1[3]);
+        // CPU MATCH: Calculate bondINb (from pi to current neighbor nb)
+        lengthNb2 = 0.0;
+        numerator = 0.0;
+        for (int i = 0; i < NDIM; ++i)
+        {
+            bondINb[i] = pi_nb_local_initial_positions[i] - pi_local_initial_positions[i];
+            lengthNb2 += bondINb[i] * bondINb[i];
+            numerator += bondIJ[i] * bondINb[i];
+        }
+
+        double lengthNb = sqrt(lengthNb2);
+        if (length <= 0.0 || lengthNb <= 0.0) continue;
+
+        // CPU MATCH: Calculate weight
+        double cosAngle = numerator / (length * lengthNb);
+        if (cosAngle > 1.0) cosAngle = 1.0; 
+        else if (cosAngle < -1.0) cosAngle = -1.0;
+
+        double lengthRatio = fabs(length - lengthNb) / (horizon * dx);
+        double weight = exp(-n1 * lengthRatio) * pow(0.5 + 0.5 * cosAngle, n2);
+
+        // CPU MATCH: Compute shape tensors for bond pi->nb (current neighbor)
+        double nb_shape_tensor0[NDIM * NDIM] = {0.0};
+        double nb_shape_tensor1[NDIM * NDIM] = {0.0};
+        
+        computeShapeTensors_GPU<NDIM, MAX_NEIGHBOR_CAPACITY>(nb_shape_tensor0, nb_shape_tensor1,
+                                      n1, n2, dx, horizon,
+                                      pi_neighbor_local_size,
+                                      pi_local_neighbor_arr,
+                                      total_local_particle_volume_arr,
+                                      total_local_particle_initial_positions_arr,
+                                      total_local_particle_current_positions_arr,
+                                      pi_local_initial_positions,
+                                      pi_nb_local_initial_positions,  // Shape tensors for bond pi->nb
+                                      total_local_particle_size);
+
+        // Debug output for detailed neighbor comparison with GPU  
+        if (pi_local_idx == 0) {
+            int pi_global_id = total_local_particle_core_ID_arr[pi_local_idx];
+            int pj_global_id = total_local_particle_core_ID_arr[pj_local_idx];
+            int nb_global_id = total_local_particle_core_ID_arr[pi_nb_local_idx];
+            printf("GPU PAIR PROCESSING: pi=%d(local=%d) -> pj=%d(local=%d), processing neighbor %d: nb=%d(local=%d)\n", 
+                   pi_global_id, pi_local_idx, pj_global_id, pj_local_idx, nidx, nb_global_id, pi_nb_local_idx);
+        }
+        
+        if (pi_local_idx == 0 && pj_local_idx == 1) {
+            printf("GPU DEBUG P0 NEIGHBOR %d: global_id=%d\n", nidx, total_local_particle_core_ID_arr[pi_nb_local_idx]);
+            printf("GPU DEBUG P0 NEIGHBOR %d: pi_pos=[%.6e,%.6e], nb_pos=[%.6e,%.6e]\n", 
+                   nidx, pi_local_initial_positions[0], pi_local_initial_positions[1],
+                   pi_nb_local_initial_positions[0], pi_nb_local_initial_positions[1]);
+            printf("GPU DEBUG P0 NEIGHBOR %d: bondINb=[%.6e,%.6e], lengthNb=%.6e\n", 
+                   nidx, bondINb[0], bondINb[1], lengthNb);
+            printf("GPU DEBUG P0 NEIGHBOR %d: weight=%.6e, volume=%.6e\n", 
+                   nidx, weight, pi_nb_volume);
+            printf("GPU DEBUG P0 NEIGHBOR %d: shape_tensor0=[%.6e,%.6e,%.6e,%.6e]\n", 
+                   nidx, nb_shape_tensor0[0], nb_shape_tensor0[1], nb_shape_tensor0[2], nb_shape_tensor0[3]);
+        }
+
+        // CPU MATCH: Compute stress tensor for this neighbor bond
+        double nb_stress_tensor[NDIM * NDIM] = {0.0};
+        computeStressTensor_GPU<NDIM, STIFFNESS_TENSOR_SIZE, MAX_NEIGHBOR_CAPACITY>(
+            nb_stress_tensor,
+            nb_shape_tensor0,
+            nb_shape_tensor1,
+            stiffness_tensor,
+            pi_local_idx, neighbor_idx);  // Use neighbor index for damage tracking
+
+        if (pi_local_idx == 0 && pj_local_idx == 1) {
+            printf("GPU DEBUG P0 NEIGHBOR %d: stress=[%.6e,%.6e,%.6e,%.6e]\n", 
+                   nidx, nb_stress_tensor[0], nb_stress_tensor[1], nb_stress_tensor[2], nb_stress_tensor[3]);
+        }
+
+        // CPU MATCH: Compute stress * shape_tensor0^(-1)
+        double nb_shape_tensor0_inv[NDIM * NDIM];
+        Mat_GPU_inverse2D(nb_shape_tensor0_inv, nb_shape_tensor0);
+        double nb_stress_shape_inv_prod[NDIM * NDIM] = {0.0};
+        Mat_GPU_mul_mat(nb_stress_shape_inv_prod, nb_stress_tensor, nb_shape_tensor0_inv, NDIM);
+
+        // CPU MATCH: Accumulate Tmatrix += (stress * shapeInv) * weight * volume
+        for (int i = 0; i < NDIM; ++i)
+        {
+            for (int j = 0; j < NDIM; ++j)
+            {
+                Tmatrix[i * NDIM + j] += nb_stress_shape_inv_prod[i * NDIM + j] * weight * pi_nb_volume;
+            }
+        }
+        horizonVolume += pi_nb_volume;
+        neighbor_idx++;
     }
 
-    // Step 2: Compute stress tensor
-    double stress_tensor[NDIM * NDIM] = {0.0};
-    computeStressTensor_GPU<NDIM, STIFFNESS_TENSOR_SIZE, MAX_NEIGHBOR_CAPACITY>(
-        stress_tensor,
-        shape_tensor0,
-        shape_tensor1,
-        stiffness_tensor,
-        pi_local_idx, pj_local_idx);
-
-    if (pi_local_idx == 0) {
-        printf("GPU STEP2: stress=[%e,%e,%e,%e]\n",
-               stress_tensor[0], stress_tensor[1], stress_tensor[2], stress_tensor[3]);
+    // Debug output for Tmatrix computation for first particle pair
+    if (pi_local_idx == 0 && pj_local_idx == 1) {
+        printf("GPU DEBUG: Tmatrix=[%e,%e,%e,%e]\n", 
+               Tmatrix[0], Tmatrix[1], Tmatrix[2], Tmatrix[3]);
+        printf("GPU DEBUG: bondIJ=[%e,%e], horizonVolume=%e\n", 
+               bondIJ[0], bondIJ[1], horizonVolume);
+        
+        // Manual calculation verification
+        double manual_x = (Tmatrix[0] / horizonVolume) * bondIJ[0] + (Tmatrix[1] / horizonVolume) * bondIJ[1];
+        double manual_y = (Tmatrix[2] / horizonVolume) * bondIJ[0] + (Tmatrix[3] / horizonVolume) * bondIJ[1];
+        printf("GPU DEBUG: manual_Tvector=[%e,%e]\n", manual_x, manual_y);
     }
 
-    // Step 3: Compute shape_tensor0^(-1)
-    double shape_tensor0_inv[NDIM * NDIM];
-    Mat_GPU_inverse2D(shape_tensor0_inv, shape_tensor0);
-
-    if (pi_local_idx == 0) {
-        printf("GPU STEP3: shape0_inv=[%e,%e,%e,%e]\n",
-               shape_tensor0_inv[0], shape_tensor0_inv[1], shape_tensor0_inv[2], shape_tensor0_inv[3]);
-    }
-
-    // Step 4: Compute T = stress * shape0_inv 
-    double T_matrix[NDIM * NDIM] = {0.0};
-    Mat_GPU_mul_mat(T_matrix, stress_tensor, shape_tensor0_inv, NDIM);
-
-    if (pi_local_idx == 0) {
-        printf("GPU STEP4: T_matrix=[%e,%e,%e,%e]\n",
-               T_matrix[0], T_matrix[1], T_matrix[2], T_matrix[3]);
-    }
-
-    // Step 5: Compute final force vector T * bondIJ
-    Mat_GPU_mul_vec(Tvector, T_matrix, bondIJ, NDIM);
-    
-    if (pi_local_idx == 0) {
-        printf("GPU STEP5: Tvector=[%e,%e]\n", Tvector[0], Tvector[1]);
+    // CPU MATCH: Normalize by horizon volume and compute final force vector
+    // CPU: Tvector = (Tmatrix.timeScalar(1.0 / horizonVolume)).timeVector(bondIJ);
+    if (horizonVolume > 0.0) {
+        for (int i = 0; i < NDIM; ++i)
+        {
+            for (int j = 0; j < NDIM; ++j)
+            {
+                Tmatrix[i * NDIM + j] /= horizonVolume;
+            }
+        }
+        Mat_GPU_mul_vec(Tvector, Tmatrix, bondIJ, NDIM);
+        
+        // Debug output for final Tvector for first particle pair
+        if (pi_local_idx == 0 && pj_local_idx == 1) {
+            printf("GPU DEBUG: final_Tvector=[%e,%e]\n", Tvector[0], Tvector[1]);
+        }
+    } else {
+        for (int i = 0; i < NDIM; ++i) {
+            Tvector[i] = 0.0;
+        }
     }
 }
 
@@ -562,7 +641,7 @@ __device__ void computeForceDensityStates_GPU(double *Tvector,
             pi_local_idx, nidx);  // FIXED: Use correct particle index
 
         // Debug output for particle 0 stress computation
-        if (pi_local_idx == 0 && nidx < 5) {
+        if (pi_local_idx == 0 && pj_local_idx == 1) {
             printf("GPU DEBUG P0 STRESS: neighbor %d\n", nidx);
             printf("GPU DEBUG P0 STRESS: shape_tensor0=[%.6e,%.6e,%.6e,%.6e]\n", 
                    nb_shape_tensor0[0], nb_shape_tensor0[1], nb_shape_tensor0[2], nb_shape_tensor0[3]);
@@ -739,9 +818,11 @@ __global__ void compute_velocity_kernel_GPU(int ndim,
         );
 
         // Debug output for particle 0 (local index 0)
-        if (cp_local_idx == 0 && cp_neighbor_local_idx <= 5) {
+        if (cp_local_idx == 0) {
             int cp_global_id = total_local_particle_core_ID_arr[cp_local_idx];
             int nb_global_id = total_local_particle_core_ID_arr[cp_neighbor_local_idx];
+            printf("=== GPU VELOCITY LOOP: Processing pi=%d(local=%d) -> pj=%d(local=%d) ===\n", 
+                   cp_global_id, cp_local_idx, nb_global_id, cp_neighbor_local_idx);
             printf("GPU DEBUG P0: pi=%d, pj=%d\n", cp_global_id, nb_global_id);
             printf("GPU DEBUG P0: forceIJ=[%e,%e]\n", forceIJ[0], forceIJ[1]);
             printf("GPU DEBUG P0: forceJI=[%e,%e]\n", forceJI[0], forceJI[1]);
@@ -981,9 +1062,9 @@ void compute_velocity_GPU_host(int ndim,
 
     cudaDeviceSynchronize(); // Ensure all data is copied before launching the kernel
 
-    // Launch the kernel with proper grid configuration
-    int blockSize = 256; // Adjust as needed - typical values are 128, 256, 512
-    int numBlocks = (core_particle_size + blockSize - 1) / blockSize;
+    // Launch the kernel with single thread for debugging
+    int blockSize = 1; // Single thread for debugging
+    int numBlocks = 1;
     
     if (core_particle_size > 0) {
         compute_velocity_kernel_GPU<NDIM, STIFFNESS_TENSOR_SIZE, MAX_NEIGHBOR_CAPACITY><<<numBlocks, blockSize>>>(
