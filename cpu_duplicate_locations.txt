@@ -1,0 +1,49 @@
+=== EXACT LOCATIONS WHERE CPU COMPUTES SHAPE TENSORS TWICE ===
+
+## FIRST CALL: In computeDamageStatus() function
+
+**File**: src/main_seq.cpp
+**Line**: 494 (inside computeDamageStatus function starting at line 472)
+**Context**: Damage computation for material failure analysis
+
+```cpp
+void computeDamageStatus(...) {
+    for (auto& pi : localParticles) {
+        vector<Particle*> piNeighbors = Neighborslist[piIndex];
+        
+        for (Particle* nb : piNeighbors) {
+            // FIRST CALL TO computeShapeTensors HERE:
+            vector<matrix> shapeTensors = computeShapeTensors(ndim, n1, n2, dx, horizon, piNeighbors, pi, *nb);
+            matrix deformationGradient = shapeTensors[1].timeMatrix(shapeTensors[0].inverse2D());
+            // ... damage calculation using shapeTensors ...
+        }
+    }
+}
+```
+
+## SECOND CALL: In computeForceDensityStates() function
+
+**File**: src/main_seq.cpp  
+**Line**: 324 (inside computeForceDensityStates function starting at line 270)
+**Context**: Force computation for velocity calculation
+
+```cpp
+vector<long double> computeForceDensityStates(...) {
+    for (Particle* nb : piNeighbors) {
+        // SECOND CALL TO computeShapeTensors HERE:
+        vector<matrix> shapeTensors = computeShapeTensors(ndim, n1, n2, dx, horizon, piNeighbors, pi, *nb);
+        
+        matrix stress = computeStressTensor(shapeTensors[0], shapeTensors[1], ndim, StiffnessTensor, bondDamage, piIndex, pjIndex);
+        // ... force calculation using shapeTensors ...
+    }
+}
+```
+
+## EXECUTION SEQUENCE:
+
+In main() function (lines 683-695):
+1. **Step 1**: `computeDamageStatus(...)` → calls computeShapeTensors 100 times
+2. **Step 2**: `computeVelocity(...)` → calls computeForceDensityStates() → calls computeShapeTensors 100 times again
+
+**Total**: 200 computeShapeTensors calls (100 + 100 duplicates)
+

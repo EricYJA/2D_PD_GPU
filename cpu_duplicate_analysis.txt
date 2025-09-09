@@ -1,0 +1,53 @@
+=== ANALYSIS: Why CPU Computes Shape Tensors Twice ===
+
+## ROOT CAUSE IDENTIFIED:
+
+The CPU processes shape tensors twice because there are TWO separate functions that both call computeShapeTensors():
+
+### 1. FIRST CALL: computeForceDensityStates() function (line 324)
+- **Purpose**: Compute force density states for velocity calculation
+- **Called from**: computeVelocity() function 
+- **Location**: Inside the main velocity computation loop
+- **Debug output**: "CPU PAIR PROCESSING" messages
+
+### 2. SECOND CALL: computeDamageStatus() function (line 494)  
+- **Purpose**: Compute damage status based on strain analysis
+- **Called from**: main() function, BEFORE computeVelocity()
+- **Location**: In the time step loop, executed before velocity computation
+- **Usage**: For material damage assessment
+
+## EXECUTION FLOW:
+```
+main() 
+├── computeDamageStatus()           ← FIRST: calls computeShapeTensors (100 times)
+│   └── computeShapeTensors()       ← for damage analysis
+└── computeVelocity()               ← SECOND: calls computeShapeTensors (100 times)  
+    └── computeForceDensityStates() ← for force computation
+        └── computeShapeTensors()   ← same computation repeated!
+```
+
+## GPU vs CPU COMPARISON:
+
+### GPU Behavior:
+- GPU ONLY runs computeVelocity() equivalent (compute_velocity_kernel_GPU)
+- GPU does NOT run damage computation in this test case
+- GPU processes shape tensors ONCE (100 pairs total)
+
+### CPU Behavior:  
+- CPU runs BOTH computeDamageStatus() AND computeVelocity()
+- CPU processes shape tensors TWICE (200 pairs total = 100 + 100)
+- Same computeShapeTensors() function called twice with identical parameters
+
+## IMPACT ON RESULTS:
+
+The duplicate computation does NOT affect final results because:
+1. ✅ Both calls use identical input parameters (same pi, pj, neighbors)
+2. ✅ computeShapeTensors() is a pure function (no side effects)  
+3. ✅ Each function uses its own local copy of the computed shape tensors
+4. ✅ The velocity computation only uses its own computed shape tensors
+5. ✅ The damage computation only uses its own computed shape tensors
+
+## VERIFICATION NEEDED:
+We should verify that final velocity results are identical between CPU and GPU
+despite this computational inefficiency in the CPU version.
+

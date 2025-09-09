@@ -121,8 +121,8 @@ __device__ void computeShapeTensors_GPU(double *shape_tensor0, // Return Val, si
     }
     double length = sqrt(length2);
     
-    // Debug output for shape tensor computation - trace particle 0 only
-    bool debug_this = (pi_init_pos[0] == -34.5 && pi_init_pos[1] == -29.5); // Enable for particle 0
+    // Debug output for shape tensor computation - trace particle 0 only  
+    bool debug_this = (abs(pi_init_pos[0] + 34.5) < 0.1 && abs(pi_init_pos[1] + 29.5) < 0.1); // Enable for particle 0
     if (debug_this) {
         printf("GPU CALL computeShapeTensors: pi_pos=[%.1f,%.1f] -> pj_pos=[%.1f,%.1f]\n", 
                pi_init_pos[0], pi_init_pos[1], pj_init_pos[0], pj_init_pos[1]);

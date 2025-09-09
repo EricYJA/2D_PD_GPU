@@ -1,0 +1,78 @@
+=== WHY CPU CALLS computeShapeTensors TWICE DURING VELOCITY COMPUTATION ===
+
+## EXACT DOUBLE CALL LOCATIONS IN VELOCITY COMPUTATION:
+
+Looking at the CPU velocity computation flow:
+
+### CPU Velocity Flow:
+```
+computeVelocity() 
+└── For each neighbor pair (pi, pj):
+    ├── Call computeForceDensityStates(pi, pj)  ← FIRST CALL
+    │   └── computeShapeTensors(pi, pj)        ← Line 324
+    └── Call computeForceDensityStates(pj, pi)  ← SECOND CALL  
+        └── computeShapeTensors(pj, pi)        ← Line 324 again
+
+```
+
+## THE ISSUE: CPU Computes BOTH DIRECTIONS
+
+**In computeVelocity() function (line 395):**
+
+1. **First Call** (line 426):
+   ```cpp
+   forceIJ = computeForceDensityStates(ndim, n1, n2, horizon, StiffnessTensor, dx, 
+                                       piNeighbors, pi, *nb, globalLocalIDmap, bondDamage);
+   ```
+   - This calls computeShapeTensors for pi→nb direction
+
+2. **Second Call** (line 433):
+   ```cpp
+   forceJI = computeForceDensityStates(ndim, n1, n2, horizon, StiffnessTensor, dx, 
+                                       pjNeighbors, *nb, pi, globalLocalIDmap, bondDamage);
+   ```
+   - This calls computeShapeTensors for nb→pi direction (REVERSE)
+
+## WHY THIS HAPPENS:
+
+The CPU implementation computes forces in BOTH DIRECTIONS for each pair:
+- forceIJ: Force from particle i acting on particle j  
+- forceJI: Force from particle j acting on particle i
+
+Each force calculation requires its own shape tensor computation:
+- forceIJ needs shape tensors from pi's perspective using pi's neighbors
+- forceJI needs shape tensors from pj's perspective using pj's neighbors
+
+## GPU vs CPU DIFFERENCE:
+
+**GPU Implementation:**
+- Only computes force in ONE direction per pair
+- Uses symmetry or different algorithm to avoid double computation
+- Total: 100 shape tensor calls
+
+**CPU Implementation:**  
+- Computes forces in BOTH directions for each pair
+- Each direction requires separate shape tensor computation
+- Total: 200 shape tensor calls (100 × 2 directions)
+
+## WHY IT'S NOT THE CAUSE OF MISMATCH:
+
+1. **Both Directions Are Physics-Correct**: 
+   - forceIJ and forceJI are both needed for Newton's 3rd law
+   - The final force is (forceIJ - forceJI) which is correct
+
+2. **Same Shape Tensor Algorithm**:
+   - Both calls use identical computeShapeTensors() function
+   - Same parameters, same computation method
+
+3. **The Real Issue is Stress Tensor Magnitude**:
+   - CPU stress values: ~10^-15 to 10^-18
+   - GPU stress values: ~10^-12 to 10^-13  
+   - This 5-6 order magnitude difference is the real problem
+
+## CONCLUSION:
+
+The double call is by design - CPU computes bidirectional forces correctly.
+The mismatch comes from fundamental differences in stress tensor computation,
+not from the number of shape tensor calls.
+
