@@ -123,13 +123,13 @@ __device__ void computeShapeTensors_GPU(double *shape_tensor0, // Return Val, si
     
     // Debug output for shape tensor computation - trace particle 0 only  
     bool debug_this = (abs(pi_init_pos[0] + 34.5) < 0.1 && abs(pi_init_pos[1] + 29.5) < 0.1); // Enable for particle 0
-    if (debug_this) {
+    /*if (debug_this) {
         printf("GPU CALL computeShapeTensors: pi_pos=[%.1f,%.1f] -> pj_pos=[%.1f,%.1f]\n", 
                pi_init_pos[0], pi_init_pos[1], pj_init_pos[0], pj_init_pos[1]);
         printf("GPU SHAPE DEBUG: bondIJ=[%.6f,%.6f], length=%.6f\n", 
                bondIJ[0], bondIJ[1], length);
         printf("GPU SHAPE DEBUG: neighbor_count=%d\n", pi_neighbor_local_size);
-    }
+    }*/
     
     // Loop through all neighbors of particle pi
     for (int nidx = 0; nidx < pi_neighbor_local_size; nidx++)
@@ -139,14 +139,14 @@ __device__ void computeShapeTensors_GPU(double *shape_tensor0, // Return Val, si
         
         // CRITICAL FIX: Add bounds checking for neighbor array access
         if (nidx >= MAX_NEIGHBOR_CAPACITY) {
-            if (debug_this) printf("GPU SHAPE ERROR: nidx %d >= MAX_NEIGHBOR_CAPACITY %d\n", nidx, MAX_NEIGHBOR_CAPACITY);
+            /*if (debug_this) printf("GPU SHAPE ERROR: nidx %d >= MAX_NEIGHBOR_CAPACITY %d\n", nidx, MAX_NEIGHBOR_CAPACITY);*/
             break;
         }
         
         // CRITICAL FIX: Check if neighbor index is valid before accessing arrays
         if (pi_nb_local_idx >= total_local_particle_size) {
-            if (debug_this) printf("GPU SHAPE ERROR: Invalid neighbor idx %d >= total_size %d\n", 
-                                  pi_nb_local_idx, total_local_particle_size);
+            /*if (debug_this) printf("GPU SHAPE ERROR: Invalid neighbor idx %d >= total_size %d\n", 
+                                  pi_nb_local_idx, total_local_particle_size);*/
             continue;
         }
         
@@ -179,7 +179,7 @@ __device__ void computeShapeTensors_GPU(double *shape_tensor0, // Return Val, si
         double weight = exp(-n1 * lengthRatio) * pow(0.5 + 0.5 * cosAngle, n2);
 
         // Debug all neighbors for complete analysis
-        if (debug_this) {
+        /*if (debug_this) {
             printf("GPU SHAPE DEBUG: neighbor %d: nb_pos=[%.6f,%.6f]\n", 
                    nidx, pi_nb_init_pos_arr[0], pi_nb_init_pos_arr[1]);
             printf("GPU SHAPE DEBUG: neighbor %d: bondINb=[%.6f,%.6f], lengthNb=%.6f\n", 
@@ -191,7 +191,7 @@ __device__ void computeShapeTensors_GPU(double *shape_tensor0, // Return Val, si
                    weight * bondINb[0] * bondINb[1] * pi_nb_volume,
                    weight * bondINb[1] * bondINb[0] * pi_nb_volume,
                    weight * bondINb[1] * bondINb[1] * pi_nb_volume);
-        }
+        }*/
 
         // Accumulate shape tensors with proper weighting (matching CPU exactly)
         for (int i = 0; i < NDIM; ++i)
@@ -205,12 +205,12 @@ __device__ void computeShapeTensors_GPU(double *shape_tensor0, // Return Val, si
     }
     
     // Debug final shape tensor values
-    if (debug_this) {
+    /*if (debug_this) {
         printf("GPU SHAPE DEBUG: final shapeRef=[%.6e,%.6e,%.6e,%.6e]\n", 
                shape_tensor0[0], shape_tensor0[1], shape_tensor0[2], shape_tensor0[3]);
         printf("GPU SHAPE DEBUG: final shapeCur=[%.6e,%.6e,%.6e,%.6e]\n", 
                shape_tensor1[0], shape_tensor1[1], shape_tensor1[2], shape_tensor1[3]);
-    }
+    }*/
 }
 
 template <int NDIM, int STIFFNESS_TENSOR_SIZE, int MAX_NEIGHBOR_CAPACITY>
@@ -232,7 +232,7 @@ __device__ void computeStressTensor_GPU(double *stress_tensor,    // Return Val,
     Mat_GPU_mul_mat(deformationGradient, shape_cur_tensor, shape_ref_tensor_inv, NDIM);
 
     // Debug output for particle 0 - trace each step
-    if (pi_local_Index == 0) {
+    /*if (pi_local_Index == 0) {
         printf("GPU PARTICLE 0 SHAPE DEBUG: shapeRef=[%.12e,%.12e,%.12e,%.12e]\n", 
                shape_ref_tensor[0], shape_ref_tensor[1], shape_ref_tensor[2], shape_ref_tensor[3]);
         printf("GPU PARTICLE 0 SHAPE DEBUG: shapeCur=[%.12e,%.12e,%.12e,%.12e]\n", 
@@ -241,7 +241,7 @@ __device__ void computeStressTensor_GPU(double *stress_tensor,    // Return Val,
                shape_ref_tensor_inv[0], shape_ref_tensor_inv[1], shape_ref_tensor_inv[2], shape_ref_tensor_inv[3]);
         printf("GPU PARTICLE 0 DEFORM DEBUG: deformGrad=[%.12e,%.12e,%.12e,%.12e]\n", 
                deformationGradient[0], deformationGradient[1], deformationGradient[2], deformationGradient[3]);
-    }
+    }*/
 
     for (int i = 0; i < NDIM; ++i)
     {
@@ -288,7 +288,7 @@ __device__ void computeStressTensor_GPU(double *stress_tensor,    // Return Val,
     Mat_GPU_mul_vec(stress_vector, stiffness_tensor, strain_vector, STIFFNESS_TENSOR_SIZE);
 
     // Debug output for particle 0 specifically
-    if (pi_local_Index == 0) {
+    /*if (pi_local_Index == 0) {
         printf("GPU PARTICLE 0 STRESS DEBUG: strain=[%.12e,%.12e,%.12e,%.12e]\n", 
                strain[0], strain[1], strain[2], strain[3]);
         printf("GPU PARTICLE 0 STRESS DEBUG: strainV=[%.12e,%.12e,%.12e]\n", 
@@ -299,7 +299,7 @@ __device__ void computeStressTensor_GPU(double *stress_tensor,    // Return Val,
                stiffness_tensor[6], stiffness_tensor[7], stiffness_tensor[8]);
         printf("GPU PARTICLE 0 STRESS DEBUG: stressV=[%.12e,%.12e,%.12e]\n", 
                stress_vector[0], stress_vector[1], stress_vector[2]);
-    }
+    }*/
 
     // Removed damage calculation - set damage to 0 for simplicity
     double damage = 0.0;
@@ -424,7 +424,7 @@ __device__ void computeForceDensityStates_GPU_pair(double *Tvector,
                                       total_local_particle_size);
 
         // Debug output for detailed neighbor comparison with GPU  
-        if (pi_local_idx == 0) {
+        /*if (pi_local_idx == 0) {
             int pi_global_id = total_local_particle_core_ID_arr[pi_local_idx];
             int pj_global_id = total_local_particle_core_ID_arr[pj_local_idx];
             int nb_global_id = total_local_particle_core_ID_arr[pi_nb_local_idx];
@@ -443,7 +443,7 @@ __device__ void computeForceDensityStates_GPU_pair(double *Tvector,
                    nidx, weight, pi_nb_volume);
             printf("GPU DEBUG P0 NEIGHBOR %d: shape_tensor0=[%.6e,%.6e,%.6e,%.6e]\n", 
                    nidx, nb_shape_tensor0[0], nb_shape_tensor0[1], nb_shape_tensor0[2], nb_shape_tensor0[3]);
-        }
+        }*/
 
         // CPU MATCH: Compute stress tensor for this neighbor bond
         double nb_stress_tensor[NDIM * NDIM] = {0.0};
@@ -454,10 +454,10 @@ __device__ void computeForceDensityStates_GPU_pair(double *Tvector,
             stiffness_tensor,
             pi_local_idx, neighbor_idx);  // Use neighbor index for damage tracking
 
-        if (pi_local_idx == 0 && pj_local_idx == 1) {
+        /*if (pi_local_idx == 0 && pj_local_idx == 1) {
             printf("GPU DEBUG P0 NEIGHBOR %d: stress=[%.6e,%.6e,%.6e,%.6e]\n", 
                    nidx, nb_stress_tensor[0], nb_stress_tensor[1], nb_stress_tensor[2], nb_stress_tensor[3]);
-        }
+        }*/
 
         // CPU MATCH: Compute stress * shape_tensor0^(-1)
         double nb_shape_tensor0_inv[NDIM * NDIM];
@@ -478,7 +478,7 @@ __device__ void computeForceDensityStates_GPU_pair(double *Tvector,
     }
 
     // Debug output for Tmatrix computation for first particle pair
-    if (pi_local_idx == 0 && pj_local_idx == 1) {
+    /*if (pi_local_idx == 0 && pj_local_idx == 1) {
         printf("GPU DEBUG: Tmatrix=[%e,%e,%e,%e]\n", 
                Tmatrix[0], Tmatrix[1], Tmatrix[2], Tmatrix[3]);
         printf("GPU DEBUG: bondIJ=[%e,%e], horizonVolume=%e\n", 
@@ -488,7 +488,7 @@ __device__ void computeForceDensityStates_GPU_pair(double *Tvector,
         double manual_x = (Tmatrix[0] / horizonVolume) * bondIJ[0] + (Tmatrix[1] / horizonVolume) * bondIJ[1];
         double manual_y = (Tmatrix[2] / horizonVolume) * bondIJ[0] + (Tmatrix[3] / horizonVolume) * bondIJ[1];
         printf("GPU DEBUG: manual_Tvector=[%e,%e]\n", manual_x, manual_y);
-    }
+    }*/
 
     // CPU MATCH: Normalize by horizon volume and compute final force vector
     // CPU: Tvector = (Tmatrix.timeScalar(1.0 / horizonVolume)).timeVector(bondIJ);
@@ -503,9 +503,9 @@ __device__ void computeForceDensityStates_GPU_pair(double *Tvector,
         Mat_GPU_mul_vec(Tvector, Tmatrix, bondIJ, NDIM);
         
         // Debug output for final Tvector for first particle pair
-        if (pi_local_idx == 0 && pj_local_idx == 1) {
+        /*if (pi_local_idx == 0 && pj_local_idx == 1) {
             printf("GPU DEBUG: final_Tvector=[%e,%e]\n", Tvector[0], Tvector[1]);
-        }
+        }*/
     } else {
         for (int i = 0; i < NDIM; ++i) {
             Tvector[i] = 0.0;
@@ -641,14 +641,14 @@ __device__ void computeForceDensityStates_GPU(double *Tvector,
             pi_local_idx, nidx);  // FIXED: Use correct particle index
 
         // Debug output for particle 0 stress computation
-        if (pi_local_idx == 0 && pj_local_idx == 1) {
+        /*if (pi_local_idx == 0 && pj_local_idx == 1) {
             printf("GPU DEBUG P0 STRESS: neighbor %d\n", nidx);
             printf("GPU DEBUG P0 STRESS: shape_tensor0=[%.6e,%.6e,%.6e,%.6e]\n", 
                    nb_shape_tensor0[0], nb_shape_tensor0[1], nb_shape_tensor0[2], nb_shape_tensor0[3]);
             printf("GPU DEBUG P0 STRESS: stress=[%.6e,%.6e,%.6e,%.6e]\n", 
                    nb_stress_tensor[0], nb_stress_tensor[1], nb_stress_tensor[2], nb_stress_tensor[3]);
             printf("GPU DEBUG P0 STRESS: weight=%.6e, volume=%.6e\n", weight, pi_nb_volume);
-        }
+        }*/
 
         // Compute stress * shape_tensor0^(-1) using neighbor-specific shape tensor
         double nb_shape_tensor0_inv[NDIM * NDIM];
@@ -678,7 +678,7 @@ __device__ void computeForceDensityStates_GPU(double *Tvector,
             }
         }
         // DEBUG: Print Tmatrix before multiplication for first particle
-        if (pi_local_idx == 0 && pj_local_idx == 1) {
+        /*if (pi_local_idx == 0 && pj_local_idx == 1) {
             printf("GPU DEBUG: Tmatrix=[%.6e,%.6e,%.6e,%.6e]\n", 
                    Tmatrix[0], Tmatrix[1], Tmatrix[2], Tmatrix[3]);
             printf("GPU DEBUG: bondIJ=[%.6e,%.6e], horizonVolume=%.6e\n", 
@@ -690,19 +690,19 @@ __device__ void computeForceDensityStates_GPU(double *Tvector,
             manual_Tvector[1] = Tmatrix[2] * bondIJ[0] + Tmatrix[3] * bondIJ[1];
             printf("GPU DEBUG: manual_Tvector=[%.6e,%.6e]\n", 
                    manual_Tvector[0], manual_Tvector[1]);
-        }
+        }*/
         
         Mat_GPU_mul_vec(Tvector, Tmatrix, bondIJ, NDIM);
         
         // DEBUG: Print detailed results for first particle
-        if (pi_local_idx == 0 && pj_local_idx == 1) {
+        /*if (pi_local_idx == 0 && pj_local_idx == 1) {
             printf("GPU DEBUG: pi=%d, pj=%d, bondIJ=[%.6f,%.6f], length=%.6f\n", 
                    pi_local_idx, pj_local_idx, bondIJ[0], bondIJ[1], length);
             printf("GPU DEBUG: horizonVolume=%.6e, neighbor_count=%d\n", 
                    horizonVolume, pi_neighbor_local_size);
             printf("GPU DEBUG: final_Tvector=[%.6e,%.6e]\n", 
                    Tvector[0], Tvector[1]);
-        }
+        }*/
     } else {
         // Set Tvector to zero if no valid horizon volume
         for (int i = 0; i < NDIM; ++i) {
@@ -721,12 +721,12 @@ __global__ void compute_velocity_kernel_GPU(int ndim,
                                             double *stiffness_tensor, // size = STIFFNESS_TENSOR_SIZE * STIFFNESS_TENSOR_SIZE in matrix
                                             double stepSize,
 
-                                            int core_particle_size,
-                                            int *core_particle_local_ID_arr, // size = totalParticleSize
+                                            int particle_size,
+                                            int *particle_local_ID_arr, // size = totalParticleSize
 
-                                            double *core_velocity_arr,              // size = totalParticleSize * ndim
-                                            double *core_acceleration_arr,          // size = totalParticleSize * ndim
-                                            double *core_net_force_arr,             // size = totalParticleSize * ndim
+                                            double *velocity_arr,              // size = totalParticleSize * ndim
+                                            double *acceleration_arr,          // size = totalParticleSize * ndim
+                                            double *net_force_arr,             // size = totalParticleSize * ndim
 
                                             /* Sequential version: all particles are local */
                                             int total_local_particle_size,           // size = totalParticleSize
@@ -741,12 +741,12 @@ __global__ void compute_velocity_kernel_GPU(int ndim,
     int cp_idx = blockIdx.x * blockDim.x + threadIdx.x;
     
     // Check bounds
-    if (cp_idx >= core_particle_size) return;
+    if (cp_idx >= particle_size) return;
 
     double forceIJ[NDIM];
     double forceJI[NDIM];
 
-    int cp_local_idx = core_particle_local_ID_arr[cp_idx];
+    int cp_local_idx = particle_local_ID_arr[cp_idx];
     
     // CRITICAL FIX: Add bounds checking for all array accesses
     if (cp_local_idx < 0 || cp_local_idx >= total_local_particle_size) {
@@ -818,7 +818,7 @@ __global__ void compute_velocity_kernel_GPU(int ndim,
         );
 
         // Debug output for particle 0 (local index 0)
-        if (cp_local_idx == 0) {
+        /*if (cp_local_idx == 0) {
             int cp_global_id = total_local_particle_core_ID_arr[cp_local_idx];
             int nb_global_id = total_local_particle_core_ID_arr[cp_neighbor_local_idx];
             printf("=== GPU VELOCITY LOOP: Processing pi=%d(local=%d) -> pj=%d(local=%d) ===\n", 
@@ -830,7 +830,7 @@ __global__ void compute_velocity_kernel_GPU(int ndim,
             printf("GPU DEBUG P0: force_contrib=[%e,%e]\n", 
                    (forceIJ[0] - forceJI[0]) * cp_neighbor_volume, 
                    (forceIJ[1] - forceJI[1]) * cp_neighbor_volume);
-        }
+        }*/
 
         for (int i = 0; i < NDIM; ++i)
         {
@@ -841,26 +841,26 @@ __global__ void compute_velocity_kernel_GPU(int ndim,
     // Store net force
     for (int i = 0; i < NDIM; ++i)
     {
-        core_net_force_arr[cp_local_idx * NDIM + i] = net_force[i];
+        net_force_arr[cp_local_idx * NDIM + i] = net_force[i];
     }
 
     // Debug output for particle 0 final results
-    if (cp_local_idx == 0) {
-        printf("GPU DEBUG P0: final_netF=[%e,%e]\n", net_force[0], net_force[1]);
-        printf("GPU DEBUG P0: acceleration=[%e,%e]\n", net_force[0] / massDensity, net_force[1] / massDensity);
-    }
+    // if (cp_local_idx == 0) {
+    //     printf("GPU DEBUG P0: final_netF=[%e,%e]\n", net_force[0], net_force[1]);
+    //     printf("GPU DEBUG P0: acceleration=[%e,%e]\n", net_force[0] / massDensity, net_force[1] / massDensity);
+    // }
 
     // Compute acceleration and update velocity
     for (int i = 0; i < NDIM; ++i)
     {
         // compute acceleration
-        acc_new[i] = core_net_force_arr[cp_local_idx * NDIM + i] / massDensity;
+        acc_new[i] = net_force_arr[cp_local_idx * NDIM + i] / massDensity;
 
         // update velocity using velocity-verlet integration
-        core_velocity_arr[cp_local_idx * NDIM + i] += 0.5 * (core_acceleration_arr[cp_local_idx * NDIM + i] + acc_new[i]) * stepSize;
+        velocity_arr[cp_local_idx * NDIM + i] += 0.5 * (acceleration_arr[cp_local_idx * NDIM + i] + acc_new[i]) * stepSize;
         
         // update acceleration for next time step
-        core_acceleration_arr[cp_local_idx * NDIM + i] = acc_new[i];
+        acceleration_arr[cp_local_idx * NDIM + i] = acc_new[i];
     }
 }
 
@@ -910,7 +910,7 @@ void compute_velocity_GPU_host(int ndim,
 
     // Prepare data for GPU computation - sequential version
     int total_particle_size = allParticles.size();
-    int core_particle_size = total_particle_size; // All particles are core particles in sequential
+    // In sequential version, all particles are processed (no core vs non-core distinction)
 
     constexpr int NDIM = 2;
     constexpr int STIFFNESS_TENSOR_SIZE = 3;  // Assuming 2D, so size is 3 (e11, e22, e12) or 6 for 3D (e11, e22, e33, e23, e13, e12)
@@ -946,12 +946,12 @@ void compute_velocity_GPU_host(int ndim,
     // Allocate memory on GPU for all necessary arrays
     double *d_stiffness_tensor;
 
-    int *d_core_particle_local_ID_arr;
+    int *d_particle_local_ID_arr;
     int *d_total_local_particle_core_ID_arr;
 
-    double *d_core_velocity_arr;
-    double *d_core_acceleration_arr;
-    double *d_core_net_force_arr;
+    double *d_velocity_arr;
+    double *d_acceleration_arr;
+    double *d_net_force_arr;
 
     int *d_total_local_particle_neighbors_arr;
     int *d_total_local_particle_neighbor_sizes_arr;
@@ -962,11 +962,11 @@ void compute_velocity_GPU_host(int ndim,
 
     // Allocate memory on GPU
     cudaMalloc((void **)&d_stiffness_tensor, sizeof(double) * STIFFNESS_TENSOR_SIZE * STIFFNESS_TENSOR_SIZE);
-    cudaMalloc((void **)&d_core_particle_local_ID_arr, sizeof(int) * core_particle_size);
+    cudaMalloc((void **)&d_particle_local_ID_arr, sizeof(int) * total_particle_size);
     cudaMalloc((void **)&d_total_local_particle_core_ID_arr, sizeof(int) * total_particle_size);
-    cudaMalloc((void **)&d_core_velocity_arr, sizeof(double) * core_particle_size * NDIM);
-    cudaMalloc((void **)&d_core_acceleration_arr, sizeof(double) * core_particle_size * NDIM);
-    cudaMalloc((void **)&d_core_net_force_arr, sizeof(double) * core_particle_size * NDIM);
+    cudaMalloc((void **)&d_velocity_arr, sizeof(double) * total_particle_size * NDIM);
+    cudaMalloc((void **)&d_acceleration_arr, sizeof(double) * total_particle_size * NDIM);
+    cudaMalloc((void **)&d_net_force_arr, sizeof(double) * total_particle_size * NDIM);
     cudaMalloc((void **)&d_total_local_particle_neighbors_arr, sizeof(int) * total_particle_size * MAX_NEIGHBOR_CAPACITY);
     cudaMalloc((void **)&d_total_local_particle_neighbor_sizes_arr, sizeof(int) * total_particle_size);
     cudaMalloc((void **)&d_total_local_particle_volume_arr, sizeof(double) * total_particle_size);
@@ -976,12 +976,12 @@ void compute_velocity_GPU_host(int ndim,
     // Prepare host arrays for data transfer
     vector<double> h_stiffness_tensor_arr(STIFFNESS_TENSOR_SIZE * STIFFNESS_TENSOR_SIZE);
 
-    vector<int> h_core_particle_local_ID_arr(core_particle_size);
+    vector<int> h_particle_local_ID_arr(total_particle_size);
     vector<int> h_total_local_particle_core_ID_arr(total_particle_size);
 
-    vector<double> h_core_velocity_arr(core_particle_size * NDIM);
-    vector<double> h_core_acceleration_arr(core_particle_size * NDIM);
-    vector<double> h_core_net_force_arr(core_particle_size * NDIM);
+    vector<double> h_velocity_arr(total_particle_size * NDIM);
+    vector<double> h_acceleration_arr(total_particle_size * NDIM);
+    vector<double> h_net_force_arr(total_particle_size * NDIM);
 
     vector<int> h_total_local_particle_neighbors_arr(total_particle_size * MAX_NEIGHBOR_CAPACITY);
     vector<int> h_total_local_particle_neighbor_sizes_arr(total_particle_size);
@@ -1002,18 +1002,17 @@ void compute_velocity_GPU_host(int ndim,
     // Sequential version: simple mapping since global ID == local index
     for (int i = 0; i < total_particle_size; ++i) {
         h_total_local_particle_core_ID_arr[i] = totalParticles[i].globalID; // Store actual global ID
-        h_core_particle_local_ID_arr[i] = i; // Simple 1:1 mapping for sequential version
+        h_particle_local_ID_arr[i] = i; // Simple 1:1 mapping for sequential version
     }
 
-    // h_core_velocity_arr, h_core_acceleration_arr, h_core_net_force_arr
-    // Sequential version: direct mapping
-    for (int i = 0; i < core_particle_size; ++i)
+    // Sequential version: direct mapping for all particles
+    for (int i = 0; i < total_particle_size; ++i)
     {
         for (int j = 0; j < NDIM; ++j)
         {
-            h_core_velocity_arr[i * NDIM + j] = velocity[i][j];
-            h_core_acceleration_arr[i * NDIM + j] = acce[i][j];
-            h_core_net_force_arr[i * NDIM + j] = netF[i][j];
+            h_velocity_arr[i * NDIM + j] = velocity[i][j];
+            h_acceleration_arr[i * NDIM + j] = acce[i][j];
+            h_net_force_arr[i * NDIM + j] = netF[i][j];
         }
     }
 
@@ -1049,11 +1048,11 @@ void compute_velocity_GPU_host(int ndim,
 
     // Copy data from host to device
     cudaMemcpy(d_stiffness_tensor, h_stiffness_tensor_arr.data(), sizeof(double) * STIFFNESS_TENSOR_SIZE * STIFFNESS_TENSOR_SIZE, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_core_particle_local_ID_arr, h_core_particle_local_ID_arr.data(), sizeof(int) * core_particle_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_particle_local_ID_arr, h_particle_local_ID_arr.data(), sizeof(int) * total_particle_size, cudaMemcpyHostToDevice);
     cudaMemcpy(d_total_local_particle_core_ID_arr, h_total_local_particle_core_ID_arr.data(), sizeof(int) * total_particle_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_core_velocity_arr, h_core_velocity_arr.data(), sizeof(double) * core_particle_size * NDIM, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_core_acceleration_arr, h_core_acceleration_arr.data(), sizeof(double) * core_particle_size * NDIM, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_core_net_force_arr, h_core_net_force_arr.data(), sizeof(double) * core_particle_size * NDIM, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_velocity_arr, h_velocity_arr.data(), sizeof(double) * total_particle_size * NDIM, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_acceleration_arr, h_acceleration_arr.data(), sizeof(double) * total_particle_size * NDIM, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_net_force_arr, h_net_force_arr.data(), sizeof(double) * total_particle_size * NDIM, cudaMemcpyHostToDevice);
     cudaMemcpy(d_total_local_particle_neighbors_arr, h_total_local_particle_neighbors_arr.data(), sizeof(int) * total_particle_size * MAX_NEIGHBOR_CAPACITY, cudaMemcpyHostToDevice);
     cudaMemcpy(d_total_local_particle_neighbor_sizes_arr, h_total_local_particle_neighbor_sizes_arr.data(), sizeof(int) * total_particle_size, cudaMemcpyHostToDevice);
     cudaMemcpy(d_total_local_particle_volume_arr, h_total_local_particle_volume_arr.data(), sizeof(double) * total_particle_size, cudaMemcpyHostToDevice);
@@ -1062,20 +1061,20 @@ void compute_velocity_GPU_host(int ndim,
 
     cudaDeviceSynchronize(); // Ensure all data is copied before launching the kernel
 
-    // Launch the kernel with single thread for debugging
-    int blockSize = 1; // Single thread for debugging
-    int numBlocks = 1;
+    // Launch the kernel to process all particles
+    int blockSize = 256;
+    int numBlocks = (total_particle_size + blockSize - 1) / blockSize;
     
-    if (core_particle_size > 0) {
+    if (total_particle_size > 0) {
         compute_velocity_kernel_GPU<NDIM, STIFFNESS_TENSOR_SIZE, MAX_NEIGHBOR_CAPACITY><<<numBlocks, blockSize>>>(
             ndim, n1, n2, horizon, dx, massDensity,
             d_stiffness_tensor,
             stepSize,
-            core_particle_size,
-            d_core_particle_local_ID_arr,
-            d_core_velocity_arr,
-            d_core_acceleration_arr,
-            d_core_net_force_arr,
+            total_particle_size,
+            d_particle_local_ID_arr,
+            d_velocity_arr,
+            d_acceleration_arr,
+            d_net_force_arr,
             total_particle_size,
             d_total_local_particle_neighbors_arr,
             d_total_local_particle_neighbor_sizes_arr,
@@ -1106,29 +1105,29 @@ void compute_velocity_GPU_host(int ndim,
     }
 
     // Copy results back from device to host
-    cudaMemcpy(h_core_velocity_arr.data(), d_core_velocity_arr, sizeof(double) * core_particle_size * NDIM, cudaMemcpyDeviceToHost);
-    cudaMemcpy(h_core_acceleration_arr.data(), d_core_acceleration_arr, sizeof(double) * core_particle_size * NDIM, cudaMemcpyDeviceToHost);
-    cudaMemcpy(h_core_net_force_arr.data(), d_core_net_force_arr, sizeof(double) * core_particle_size * NDIM, cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_velocity_arr.data(), d_velocity_arr, sizeof(double) * total_particle_size * NDIM, cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_acceleration_arr.data(), d_acceleration_arr, sizeof(double) * total_particle_size * NDIM, cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_net_force_arr.data(), d_net_force_arr, sizeof(double) * total_particle_size * NDIM, cudaMemcpyDeviceToHost);
 
     // Update the original data structures with results from GPU
-    for (int i = 0; i < core_particle_size; ++i)
+    for (int i = 0; i < total_particle_size; ++i)
     {
         for (int j = 0; j < NDIM; ++j)
         {
-            velocity[i][j] = static_cast<long double>(h_core_velocity_arr[i * NDIM + j]);
-            acce[i][j] = static_cast<long double>(h_core_acceleration_arr[i * NDIM + j]);
-            netF[i][j] = static_cast<long double>(h_core_net_force_arr[i * NDIM + j]);
+            velocity[i][j] = static_cast<long double>(h_velocity_arr[i * NDIM + j]);
+            acce[i][j] = static_cast<long double>(h_acceleration_arr[i * NDIM + j]);
+            netF[i][j] = static_cast<long double>(h_net_force_arr[i * NDIM + j]);
         }
     }
 
 cleanup:
     // Free GPU memory
     cudaFree(d_stiffness_tensor);
-    cudaFree(d_core_particle_local_ID_arr);
+    cudaFree(d_particle_local_ID_arr);
     cudaFree(d_total_local_particle_core_ID_arr);
-    cudaFree(d_core_velocity_arr);
-    cudaFree(d_core_acceleration_arr);
-    cudaFree(d_core_net_force_arr);
+    cudaFree(d_velocity_arr);
+    cudaFree(d_acceleration_arr);
+    cudaFree(d_net_force_arr);
     cudaFree(d_total_local_particle_neighbors_arr);
     cudaFree(d_total_local_particle_neighbor_sizes_arr);
     cudaFree(d_total_local_particle_volume_arr);

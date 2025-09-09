@@ -1,0 +1,10 @@
+Hello
+findNeighbor completed.
+Total number of particles: 4064
+buildLocalNeighborlist completed.
+initialize bondDamageThreshold and bondDamage completed.
+--------time step---------0--------
+Current velocity data stored in ./output/velocity_step_0_after_cuda.txt
+=== VELOCITY COMPUTATION TIMING RESULTS ===
+GPU Time: 609138 microseconds (609.138 ms)
+============================================

@@ -88,12 +88,12 @@ vector<matrix> computeShapeTensors(int ndim, double n1, double n2, double dx, do
     
     // Debug output for shape tensor computation - trace first particle
     bool debug_this = false;
-    if (debug_this) {
+    /*if (debug_this) {
         cout << "CPU SHAPE DEBUG: pi=[" << pi.initialPositions[0] << "," << pi.initialPositions[1] 
              << "], pj=[" << pj.initialPositions[0] << "," << pj.initialPositions[1] << "]" << endl;
         cout << "CPU SHAPE DEBUG: bondIJ=[" << bondIJ[0] << "," << bondIJ[1] << "], length=" << length << endl;
         cout << "CPU SHAPE DEBUG: neighbor_count=" << piNeighbors.size() << endl;
-    }
+    }*/
     
     int neighbor_idx = 0;
     for (const Particle* nb : piNeighbors){
@@ -119,7 +119,7 @@ vector<matrix> computeShapeTensors(int ndim, double n1, double n2, double dx, do
         double weight = exp(-n1 * lengthRatio) * pow(0.5 + 0.5 * cosAngle, n2);
 
         // Debug first few neighbors for detailed analysis
-        if (debug_this && neighbor_idx < 3) {
+        /*if (debug_this && neighbor_idx < 3) {
             cout << "CPU SHAPE DEBUG: neighbor " << neighbor_idx << ": nb_pos=[" << nb->initialPositions[0] 
                  << "," << nb->initialPositions[1] << "]" << endl;
             cout << "CPU SHAPE DEBUG: neighbor " << neighbor_idx << ": bondINb=[" << bondINb[0] 
@@ -131,7 +131,7 @@ vector<matrix> computeShapeTensors(int ndim, double n1, double n2, double dx, do
                  << weight * bondINb[0] * bondINb[1] * nb->volume << ","
                  << weight * bondINb[1] * bondINb[0] * nb->volume << ","
                  << weight * bondINb[1] * bondINb[1] * nb->volume << "]" << endl;
-        }
+        }*/
 
         for (int k = 0; k < ndim; ++k){
             for (int l = 0; l < ndim; ++l){
@@ -144,14 +144,14 @@ vector<matrix> computeShapeTensors(int ndim, double n1, double n2, double dx, do
     }
     
     // Debug final shape tensor values
-    if (debug_this) {
+    /*if (debug_this) {
         cout << "CPU SHAPE DEBUG: final shapeRef=[" << scientific << setprecision(6)
              << shapeTensors[0].elements[0][0] << "," << shapeTensors[0].elements[0][1] << ","
              << shapeTensors[0].elements[1][0] << "," << shapeTensors[0].elements[1][1] << "]" << endl;
         cout << "CPU SHAPE DEBUG: final shapeCur=[" << scientific << setprecision(6)
              << shapeTensors[1].elements[0][0] << "," << shapeTensors[1].elements[0][1] << ","
              << shapeTensors[1].elements[1][0] << "," << shapeTensors[1].elements[1][1] << "]" << endl;
-    }
+    }*/
 
     return shapeTensors;
 }
@@ -297,12 +297,12 @@ vector<long double> computeForceDensityStates(int ndim, double n1, double n2, do
         pjIndex += 1;
 
         // Debug output for shape tensors and stress
-        if (pi.globalID == 0 && pj.globalID == 1 && index < 3) {
+        /*if (pi.globalID == 0 && pj.globalID == 1 && index < 3) {
             cout << "CPU DEBUG: pi=0, pj=1, nb=" << nb->globalID << endl;
             cout << "CPU DEBUG: shape_tensor0=[" << scientific << setprecision(6) << shapeTensors[0].elements[0][0] << "," << shapeTensors[0].elements[0][1] << "," << shapeTensors[0].elements[1][0] << "," << shapeTensors[0].elements[1][1] << "]" << endl;
             cout << "CPU DEBUG: stress=[" << scientific << setprecision(6) << stress.elements[0][0] << "," << stress.elements[0][1] << "," << stress.elements[1][0] << "," << stress.elements[1][1] << "]" << endl;
             cout << "CPU DEBUG: weight=" << scientific << setprecision(6) << weight << ", volume=" << scientific << setprecision(6) << nb->volume << endl;
-        }
+        }*/
 
         Tmatrix = Tmatrix.matrixAdd((stress.timeMatrix(shapeTensors[0].inverse2D())).timeScalar(weight * nb->volume));
         horizonVolume += nb->volume;
@@ -384,10 +384,10 @@ void computeVelocity(int ndim, double n1, double n2, double horizon, double dx, 
         netF[i] = netForce;
 
         // Debug output for particle 0 final results
-        if (i == 0) {
+        /*if (i == 0) {
             cout << "CPU DEBUG P0: final_netF=[" << scientific << setprecision(6) << netF[i][0] << "," << netF[i][1] << "]" << endl;
             cout << "CPU DEBUG P0: acceleration=[" << scientific << setprecision(6) << netF[i][0] / massDensity << "," << netF[i][1] / massDensity << "]" << endl;
-        }
+        }*/
 
         // netF[i] = computeNetForce(rank, ndim, horizon, dx, localParticles, ghostParticles,
         //           globalLocalIDmap, globalPartitionIDmap, globalGhostIDmap, pi);

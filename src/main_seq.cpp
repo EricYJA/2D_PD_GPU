@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <set>
 #include <iomanip>
+#include <chrono>
 #include <Eigen/Dense>
 #include "util.h"
 #include "matrix.h"
@@ -86,12 +87,12 @@ vector<matrix> computeShapeTensors(int ndim, double n1, double n2, double dx, do
     
     // Debug output for shape tensor computation - trace first particle
     bool debug_this = false;
-    if (debug_this) {
+    /*if (debug_this) {
         cout << "CPU SHAPE DEBUG: pi=[" << pi.initialPositions[0] << "," << pi.initialPositions[1] 
              << "], pj=[" << pj.initialPositions[0] << "," << pj.initialPositions[1] << "]" << endl;
         cout << "CPU SHAPE DEBUG: bondIJ=[" << bondIJ[0] << "," << bondIJ[1] << "], length=" << length << endl;
         cout << "CPU SHAPE DEBUG: neighbor_count=" << piNeighbors.size() << endl;
-    }
+    }*/
     
     int neighbor_idx = 0;
     for (const Particle* nb : piNeighbors){
@@ -117,7 +118,7 @@ vector<matrix> computeShapeTensors(int ndim, double n1, double n2, double dx, do
         double weight = exp(-n1 * lengthRatio) * pow(0.5 + 0.5 * cosAngle, n2);
 
         // Debug first few neighbors for detailed analysis
-        if (debug_this && neighbor_idx < 3) {
+        /*if (debug_this && neighbor_idx < 3) {
             cout << "CPU SHAPE DEBUG: neighbor " << neighbor_idx << ": nb_pos=[" << nb->initialPositions[0] 
                  << "," << nb->initialPositions[1] << "]" << endl;
             cout << "CPU SHAPE DEBUG: neighbor " << neighbor_idx << ": bondINb=[" << bondINb[0] 
@@ -129,7 +130,7 @@ vector<matrix> computeShapeTensors(int ndim, double n1, double n2, double dx, do
                  << weight * bondINb[0] * bondINb[1] * nb->volume << ","
                  << weight * bondINb[1] * bondINb[0] * nb->volume << ","
                  << weight * bondINb[1] * bondINb[1] * nb->volume << "]" << endl;
-        }
+        }*/
 
         for (int k = 0; k < ndim; ++k){
             for (int l = 0; l < ndim; ++l){
@@ -142,14 +143,14 @@ vector<matrix> computeShapeTensors(int ndim, double n1, double n2, double dx, do
     }
     
     // Debug final shape tensor values
-    if (debug_this) {
+    /*if (debug_this) {
         cout << "CPU SHAPE DEBUG: final shapeRef=[" << scientific << setprecision(6)
              << shapeTensors[0].elements[0][0] << "," << shapeTensors[0].elements[0][1] << ","
              << shapeTensors[0].elements[1][0] << "," << shapeTensors[0].elements[1][1] << "]" << endl;
         cout << "CPU SHAPE DEBUG: final shapeCur=[" << scientific << setprecision(6)
              << shapeTensors[1].elements[0][0] << "," << shapeTensors[1].elements[0][1] << ","
              << shapeTensors[1].elements[1][0] << "," << shapeTensors[1].elements[1][1] << "]" << endl;
-    }
+    }*/
 
     return shapeTensors;
 }
@@ -203,14 +204,14 @@ matrix getStiffnessTensor(int ndim, double E, double nv){
 matrix computeStressTensor(matrix& shapeRef, matrix& shapeCur, int ndim, matrix& StiffnessTensor, vector<vector<double>>& bondDamage, int piIndex, int pjIndex){
 
     // PARTICLE PAIR DEBUG: Print stress tensor function entry
-    if (piIndex == 0) {
+    /*if (piIndex == 0) {
         cout << "CPU ENTRY computeStressTensor: pi_local=" << piIndex << ", pj_local(neighbor_idx)=" << pjIndex << endl;
-    }
+    }*/
 
     matrix stress;
     
     // DEBUG: Print matrix multiplication inputs
-    if (piIndex == 0) {
+    /*if (piIndex == 0) {
         matrix shapeRefInv = shapeRef.inverse2D();
         cout << "CPU MATRIX DEBUG: shapeCur=[" << scientific << setprecision(12) 
              << shapeCur.elements[0][0] << "," << shapeCur.elements[0][1] << "," 
@@ -218,7 +219,7 @@ matrix computeStressTensor(matrix& shapeRef, matrix& shapeCur, int ndim, matrix&
         cout << "CPU MATRIX DEBUG: shapeRefInv=[" << scientific << setprecision(12) 
              << shapeRefInv.elements[0][0] << "," << shapeRefInv.elements[0][1] << "," 
              << shapeRefInv.elements[1][0] << "," << shapeRefInv.elements[1][1] << "]" << endl;
-    }
+    }*/
     
     matrix deformationGradient = shapeCur.timeMatrix(shapeRef.inverse2D());
 
@@ -270,9 +271,9 @@ matrix computeStressTensor(matrix& shapeRef, matrix& shapeCur, int ndim, matrix&
 vector<long double> computeForceDensityStates(int ndim, double n1, double n2, double horizon, matrix& StiffnessTensor, double dx, vector<Particle*>& piNeighbors, Particle& pi, Particle& pj, const unordered_map<int, int>& globalLocalIDmap, vector<vector<double>>& bondDamage){
 
     // PARTICLE PAIR DEBUG: Print function entry
-    if (pi.globalID == 0) {
+    /*if (pi.globalID == 0) {
         cout << "CPU CALL computeForceDensityStates: pi_local=" << globalLocalIDmap.at(pi.globalID) << "(global=" << pi.globalID << ") -> pj_local=" << globalLocalIDmap.at(pj.globalID) << "(global=" << pj.globalID << ")" << endl;
-    }
+    }*/
 
     matrix Tmatrix = matrix(ndim, vector<long double>(ndim * ndim, 0.0));
     Particle pnb;
@@ -313,43 +314,43 @@ vector<long double> computeForceDensityStates(int ndim, double n1, double n2, do
         double weight = exp(-n1 * lengthRatio) * pow(0.5 + 0.5 * cosAngle, n2);
 
         // PARTICLE PAIR DEBUG: Print shape tensor computation call
-        if (pi.globalID == 0) {
+        /*if (pi.globalID == 0) {
             cout << "CPU PAIR PROCESSING: pi=" << pi.globalID << "(local=" << globalLocalIDmap.at(pi.globalID) << ") -> pj=" << pj.globalID << "(local=" << globalLocalIDmap.at(pj.globalID) << "), processing neighbor " << neighbor_idx << ": nb=" << nb->globalID << "(local=" << globalLocalIDmap.at(nb->globalID) << ")" << endl;
         }
         
         if (pi.globalID == 0) {
             cout << "CPU CALL computeShapeTensors: pi_local=" << globalLocalIDmap.at(pi.globalID) << "(global=" << pi.globalID << ") -> nb_local=" << globalLocalIDmap.at(nb->globalID) << "(global=" << nb->globalID << ")" << endl;
-        }
+        }*/
         
         vector<matrix> shapeTensors = computeShapeTensors(ndim, n1, n2, dx, horizon, piNeighbors, pi, *nb);
 
         // PARTICLE PAIR DEBUG: Print shape tensor values
-        if (pi.globalID == 0) {
+        /*if (pi.globalID == 0) {
             cout << "CPU DEBUG P0 NEIGHBOR " << neighbor_idx << ": nb_shape_tensor0=[" << scientific << setprecision(12) 
                  << shapeTensors[0].elements[0][0] << "," << shapeTensors[0].elements[0][1] << "," 
                  << shapeTensors[0].elements[1][0] << "," << shapeTensors[0].elements[1][1] << "]" << endl;
             cout << "CPU DEBUG P0 NEIGHBOR " << neighbor_idx << ": nb_shape_tensor1=[" << scientific << setprecision(12) 
                  << shapeTensors[1].elements[0][0] << "," << shapeTensors[1].elements[0][1] << "," 
                  << shapeTensors[1].elements[1][0] << "," << shapeTensors[1].elements[1][1] << "]" << endl;
-        }
+        }*/
 
         // PARTICLE PAIR DEBUG: Print stress tensor computation call  
-        if (pi.globalID == 0) {
+        /*if (pi.globalID == 0) {
             cout << "CPU CALL computeStressTensor: pi_local=" << globalLocalIDmap.at(pi.globalID) << "(global=" << pi.globalID << "), neighbor_idx=" << neighbor_idx << endl;
-        }
+        }*/
         
         matrix stress = computeStressTensor(shapeTensors[0], shapeTensors[1], ndim, StiffnessTensor, bondDamage, piIndex, pjIndex);
         pjIndex += 1;
 
         // Debug output for detailed neighbor comparison with GPU
-        if (pi.globalID == 0 && neighbor_idx < 5 && pj.globalID == 1) {
+        /*if (pi.globalID == 0 && neighbor_idx < 5 && pj.globalID == 1) {
             cout << "CPU DEBUG P0 NEIGHBOR " << neighbor_idx << ": global_id=" << nb->globalID << endl;
             cout << "CPU DEBUG P0 NEIGHBOR " << neighbor_idx << ": pi_pos=[" << pi.initialPositions[0] << "," << pi.initialPositions[1] << "], nb_pos=[" << nb->initialPositions[0] << "," << nb->initialPositions[1] << "]" << endl;
             cout << "CPU DEBUG P0 NEIGHBOR " << neighbor_idx << ": bondINb=[" << bondINb[0] << "," << bondINb[1] << "], lengthNb=" << lengthNb << endl;
             cout << "CPU DEBUG P0 NEIGHBOR " << neighbor_idx << ": weight=" << weight << ", volume=" << nb->volume << endl;
             cout << "CPU DEBUG P0 NEIGHBOR " << neighbor_idx << ": shape_tensor0=[" << shapeTensors[0].elements[0][0] << "," << shapeTensors[0].elements[0][1] << "," << shapeTensors[0].elements[1][0] << "," << shapeTensors[0].elements[1][1] << "]" << endl;
             cout << "CPU DEBUG P0 NEIGHBOR " << neighbor_idx << ": stress=[" << stress.elements[0][0] << "," << stress.elements[0][1] << "," << stress.elements[1][0] << "," << stress.elements[1][1] << "]" << endl;
-        }
+        }*/
 
         Tmatrix = Tmatrix.matrixAdd((stress.timeMatrix(shapeTensors[0].inverse2D())).timeScalar(weight * nb->volume));
         horizonVolume += nb->volume;
@@ -357,7 +358,7 @@ vector<long double> computeForceDensityStates(int ndim, double n1, double n2, do
     }
 
     // Debug output for Tmatrix computation for first particle pair
-    if (pi.globalID == 0 && pj.globalID == 1) {
+    /*if (pi.globalID == 0 && pj.globalID == 1) {
         cout << "CPU DEBUG: Tmatrix=[" << Tmatrix.elements[0][0] << "," << Tmatrix.elements[0][1] << "," << Tmatrix.elements[1][0] << "," << Tmatrix.elements[1][1] << "]" << endl;
         cout << "CPU DEBUG: bondIJ=[" << bondIJ[0] << "," << bondIJ[1] << "], horizonVolume=" << horizonVolume << endl;
         
@@ -365,14 +366,14 @@ vector<long double> computeForceDensityStates(int ndim, double n1, double n2, do
         double manual_x = (Tmatrix.elements[0][0] / horizonVolume) * bondIJ[0] + (Tmatrix.elements[0][1] / horizonVolume) * bondIJ[1];
         double manual_y = (Tmatrix.elements[1][0] / horizonVolume) * bondIJ[0] + (Tmatrix.elements[1][1] / horizonVolume) * bondIJ[1];
         cout << "CPU DEBUG: manual_Tvector=[" << manual_x << "," << manual_y << "]" << endl;
-    }
+    }*/
 
     vector<long double> Tvector = (Tmatrix.timeScalar(1.0 / horizonVolume)).timeVector(bondIJ);
 
     // Debug output for final Tvector for first particle pair
-    if (pi.globalID == 0 && pj.globalID == 1) {
+    /*if (pi.globalID == 0 && pj.globalID == 1) {
         cout << "CPU DEBUG: final_Tvector=[" << Tvector[0] << "," << Tvector[1] << "]" << endl;
-    }
+    }*/
 
     return Tvector;
 
@@ -415,31 +416,31 @@ void computeVelocity(int ndim, double n1, double n2, double horizon, double dx, 
             pjNeighbors = Neighborslist[localID];
 
             // PARTICLE PAIR DEBUG: Print forceIJ computation call
-            if (i == 0) {
+            /*if (i == 0) {
                 cout << "=== CPU VELOCITY LOOP: Processing pi=" << pi.globalID << "(local=" << i << ") -> pj=" << nb->globalID << "(local=" << globalLocalIDmap.at(nb->globalID) << ") ===" << endl;
             }
             
             if (i == 0) {
                 cout << "CPU CALL forceIJ: pi_local=" << i << "(global=" << pi.globalID << ") -> pj_local=" << globalLocalIDmap.at(nb->globalID) << "(global=" << nb->globalID << ")" << endl;
-            }
+            }*/
             
             forceIJ = computeForceDensityStates(ndim, n1, n2, horizon, StiffnessTensor, dx, piNeighbors, pi, *nb, globalLocalIDmap, bondDamage);
             
             // PARTICLE PAIR DEBUG: Print forceJI computation call
-            if (i == 0) {
+            /*if (i == 0) {
                 cout << "CPU CALL forceJI: pj_local=" << globalLocalIDmap.at(nb->globalID) << "(global=" << nb->globalID << ") -> pi_local=" << i << "(global=" << pi.globalID << ")" << endl;
-            }
+            }*/
             
             forceJI = computeForceDensityStates(ndim, n1, n2, horizon, StiffnessTensor, dx, pjNeighbors, *nb, pi, globalLocalIDmap, bondDamage);
 
             // Debug output for particle 0 (index 0)
-            if (i == 0) {
+            /*if (i == 0) {
                 cout << "CPU DEBUG P0: pi=" << pi.globalID << ", pj=" << nb->globalID << endl;
                 cout << "CPU DEBUG P0: forceIJ=[" << scientific << setprecision(6) << forceIJ[0] << "," << forceIJ[1] << "]" << endl;
                 cout << "CPU DEBUG P0: forceJI=[" << scientific << setprecision(6) << forceJI[0] << "," << forceJI[1] << "]" << endl;
                 cout << "CPU DEBUG P0: volume=" << scientific << setprecision(6) << nb->volume << endl;
                 cout << "CPU DEBUG P0: force_contrib=[" << scientific << setprecision(6) << (forceIJ[0] - forceJI[0]) * nb->volume << "," << (forceIJ[1] - forceJI[1]) * nb->volume << "]" << endl;
-            }
+            }*/
 
             pjNeighbors.clear();
 
@@ -451,10 +452,10 @@ void computeVelocity(int ndim, double n1, double n2, double horizon, double dx, 
         netF[i] = netForce;
 
         // Debug output for particle 0 final results
-        if (i == 0) {
+        /*if (i == 0) {
             cout << "CPU DEBUG P0: final_netF=[" << scientific << setprecision(6) << netF[i][0] << "," << netF[i][1] << "]" << endl;
             cout << "CPU DEBUG P0: acceleration=[" << scientific << setprecision(6) << netF[i][0] / massDensity << "," << netF[i][1] / massDensity << "]" << endl;
-        }
+        }*/
 
         // netF[i] = computeNetForce(rank, ndim, horizon, dx, localParticles, ghostParticles,
         //           globalLocalIDmap, globalPartitionIDmap, globalGhostIDmap, pi);
@@ -692,10 +693,19 @@ int main(int argc, char *argv[]){
     
         // No need to update ghost particles in sequential version
     
+        // Time CPU Velocity Computation
+        auto cpu_start = std::chrono::high_resolution_clock::now();
         computeVelocity(ndim, n1, n2, horizon, dx, massDensity, StiffnessTensor, stepSize, velocity, Neighborslist, acce, netF,
                         allParticles, globalLocalIDmap, bondDamage);
+        auto cpu_end = std::chrono::high_resolution_clock::now();
+        auto cpu_duration = std::chrono::duration_cast<std::chrono::microseconds>(cpu_end - cpu_start);
         
         storeVelocity(ndim, velocity, "./output/velocity_step_0_after_seq_ref.txt");
+        
+        // Print timing results
+        cout << "=== VELOCITY COMPUTATION TIMING RESULTS ===" << endl;
+        cout << "CPU Time: " << cpu_duration.count() << " microseconds (" << cpu_duration.count() / 1000.0 << " ms)" << endl;
+        cout << "============================================" << endl;
     
         if (j % 5000 == 0) {
             outputLocalParticlesPositions(0, allParticles, ndim, j);

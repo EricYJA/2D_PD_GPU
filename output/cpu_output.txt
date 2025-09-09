@@ -1,0 +1,10 @@
+Hello
+findNeighbor completed.
+Total number of particles: 4064
+buildLocalNeighborlist completed.
+initialize bondDamageThreshold and bondDamage completed.
+--------time step---------0--------
+Current velocity data stored in ./output/velocity_step_0_after_seq_ref.txt
+=== VELOCITY COMPUTATION TIMING RESULTS ===
+CPU Time: 69967052 microseconds (69967.1 ms)
+============================================
